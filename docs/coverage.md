@@ -86,7 +86,7 @@ Statuses: **local** = evaluator route exists; **bounded** = deliberately restric
 | SUBSETOF / ANYOF / NONEOF | bounded | Non-list right side makes SUBSETOF/ANYOF/NONEOF false (Jayway 2.9.0); SAP acceptance unverified. |
 | =~ regular-expression literal | bounded | Whole-value match like Jayway 2.9.0 (`/b/` does not match `abc`); the SAP example pads with `.*`. SAP's version unverified. |
 | JSONPath property/bracket/index access | bounded | Own Jayway-dialect evaluator (no JSONPath Plus); negative indices and name unions supported; Jayway version unverified. |
-| Wildcard / union / slice / recursive descent | bounded | Mixed-sign and step slices and `..[?()]` are explicit errors. |
+| Wildcard / union / slice / recursive descent | bounded | A single `.` before a bracket (`$.a.['b']`) is skipped, as in Jayway. Mixed-sign and step slices and `..[?()]` are explicit errors. |
 | JSONPath filters | bounded | Bare path in a filter is an existence test with Jayway's rule: nothing missing on the way, and an indefinite path exists even if it selects nothing; filter on an object tests the object; filter on a primitive/null errors. Explicit condition parser; no JavaScript execution. |
 | Terminal length/min/max/sum/avg/first/last | bounded | Never returns NaN/Infinity: non-numeric members and empty min/max/avg error (stricter than Jayway). |
 | Other Jayway path functions | bounded | stddev/keys/concat/append/index and `~`, `^` error. |

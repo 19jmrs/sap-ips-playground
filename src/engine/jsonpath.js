@@ -102,7 +102,8 @@ function parseBracket(path, open) {
 function parseSegment(path, start) {
   const recursive = path.startsWith('..', start);
   const afterDots = start + (recursive ? 2 : path[start] === '.' ? 1 : 0);
-  if (path[afterDots] === '[' && (recursive || afterDots === start)) {
+  // Jayway skips a single `.` that sits directly before a bracket, so `$.a.['b']` reads like `$.a['b']`.
+  if (path[afterDots] === '[') {
     const { segment, end } = parseBracket(path, afterDots);
     return { segment: { ...segment, recursive }, end };
   }

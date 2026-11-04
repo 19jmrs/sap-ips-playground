@@ -187,6 +187,33 @@ test('non-Jayway extensions of JavaScript JSONPath libraries are rejected, not a
   assert.throws(() => read(data, '$.a .b'), /Unsupported or invalid JSONPath/);
 });
 
+test('a single dot directly before a bracket is skipped, as in Jayway 2.9.0', () => {
+  const data = {
+    emails: [
+      { value: 'a@x', display: 'A', primary: true, type: 'work' },
+      { value: 'b@x', primary: false },
+    ],
+    name: { given: 'G', family: 'F' },
+  };
+  const projected = [
+    { value: 'a@x', display: 'A', primary: true },
+    { value: 'b@x', primary: false },
+  ];
+  assert.deepEqual(read(data, "$.emails[*].['value','display','primary']"), projected);
+  assert.deepEqual(
+    read(data, "$.emails[*].['value','display','primary']"),
+    read(data, "$.emails[*]['value','display','primary']"),
+  );
+  assert.deepEqual(read(data, "$.emails[*].['value']"), ['a@x', 'b@x']);
+  assert.deepEqual(read(data, "$.name.['given','family']"), { given: 'G', family: 'F' });
+  assert.deepEqual(read(data, '$.emails.[0]'), data.emails[0]);
+  assert.deepEqual(read(data, '$.emails.[*]'), data.emails);
+  assert.equal(read(data, "$.emails.['value']"), undefined, 'a property name on an array finds nothing');
+  // A dot is still rejected when nothing valid follows it.
+  assert.throws(() => read(data, '$.emails[*].'), /Unsupported or invalid JSONPath/);
+  assert.throws(() => read(data, '$.emails..'), /Unsupported or invalid JSONPath/);
+});
+
 test('path aggregates compute numbers and never return NaN or Infinity', () => {
   const data = {
     n: [1, 2.5, 4],
