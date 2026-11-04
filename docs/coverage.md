@@ -80,14 +80,14 @@ Statuses: **local** = evaluator route exists; **bounded** = deliberately restric
 | isAttributeWithOptionalPrefix | local | Attribute/property missing follows documented optional behavior. |
 | isAttributeWithMandatoryPrefix | local | Both values required for true. |
 | && / \|\| / ! / parentheses | local | Precedence and error reporting must be tested. |
-| == / != / < / <= / > / >= | bounded | Deep order-independent equality; ordering only number-vs-number and string-vs-string, otherwise false (Jayway evaluators, version unverified). |
-| contains / IN / NIN | bounded | No coercion; NIN is the negation of IN. |
-| EMPTY / SIZE | bounded | Missing/null on EMPTY/SIZE evaluate true here; Jayway differs. Open live-IPS reference case. |
-| SUBSETOF / ANYOF / NONEOF | bounded | Non-list right side makes SUBSETOF/ANYOF/NONEOF false (Jayway source); SAP acceptance unverified. |
-| =~ regular-expression literal | bounded | Substring (find) test here; Jayway uses whole-match; the SAP example pads with `.*`. Open reference case. |
+| == / != / < / <= / > / >= | bounded | Deep order-independent equality; a number equals a numeric string for `==`/`!=` (not `===`); a missing value equals nothing. Ordering only number-vs-number and string-vs-string, otherwise false. Checked against Jayway 2.9.0; SAP's version unverified. |
+| contains / IN / NIN | bounded | Members compare like `==`; IN and NIN are both false when the right side is not a list (Jayway 2.9.0). |
+| EMPTY / SIZE | bounded | Strings and arrays only; null, missing, numbers and booleans are false for both EMPTY forms and for SIZE; EMPTY on an object errors (Jayway 2.9.0). Top-level (non-filter) behaviour in SAP is an open reference case. |
+| SUBSETOF / ANYOF / NONEOF | bounded | Non-list right side makes SUBSETOF/ANYOF/NONEOF false (Jayway 2.9.0); SAP acceptance unverified. |
+| =~ regular-expression literal | bounded | Whole-value match like Jayway 2.9.0 (`/b/` does not match `abc`); the SAP example pads with `.*`. SAP's version unverified. |
 | JSONPath property/bracket/index access | bounded | Own Jayway-dialect evaluator (no JSONPath Plus); negative indices and name unions supported; Jayway version unverified. |
 | Wildcard / union / slice / recursive descent | bounded | Mixed-sign and step slices and `..[?()]` are explicit errors. |
-| JSONPath filters | bounded | Bare path in a filter is an existence test; filter on an object tests the object; filter on a primitive/null errors. Explicit condition parser; no JavaScript execution. |
+| JSONPath filters | bounded | Bare path in a filter is an existence test with Jayway's rule: nothing missing on the way, and an indefinite path exists even if it selects nothing; filter on an object tests the object; filter on a primitive/null errors. Explicit condition parser; no JavaScript execution. |
 | Terminal length/min/max/sum/avg/first/last | bounded | Never returns NaN/Infinity: non-numeric members and empty min/max/avg error (stricter than Jayway). |
 | Other Jayway path functions | bounded | stddev/keys/concat/append/index and `~`, `^` error. |
 | Java regex constructs | bounded | Unsupported constructs must error; negative lookahead ?! is rejected by current SAP validation release note. |

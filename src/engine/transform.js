@@ -1,4 +1,4 @@
-import { contextOperations, entityTypes, mappingKeys, mappingTypes } from './catalog.js';
+import { contextOperations, entityTypes, mappingKeys, mappingTypeKeys, mappingTypes } from './catalog.js';
 import { evaluateCondition } from './conditions.js';
 import { classify, failWith, within } from './errors.js';
 import { removeMapping, renameMapping, setMapping, valueMapping } from './mapping-types.js';
@@ -15,14 +15,8 @@ const mappingHandlers = {
   valueMapping,
 };
 
-// Keys each non-default type acts on. A key outside this list would be silently ignored, so it is
-// rejected instead. `set` accepts every key (its handler reports misplaced valueMapping keys).
-const commonKeys = ['type', 'condition', 'ignore', 'scope', 'functions'];
-const typeKeys = {
-  remove: [...commonKeys, 'targetPath', 'optional'],
-  rename: [...commonKeys, 'targetPath', 'constant', 'optional'],
-  valueMapping: [...commonKeys, 'sourcePaths', 'valueMappings', 'targetPath', 'defaultValue', 'optional'],
-};
+// `set` accepts every key (its handler reports misplaced valueMapping keys); the other types list theirs in
+// catalog.js (mappingTypeKeys), where the editor reads the same table.
 
 // Accepts either { user, group, role } documents or a bare section with `mappings`.
 function selectSection(document, entityType) {
@@ -74,7 +68,7 @@ function validateMapping(mapping) {
     if (mapping.functions?.length) {
       failWith('UNSUPPORTED', `Functions on ${type} mappings are not verified; no approximate result returned`);
     }
-    const ignored = Object.keys(mapping).find((key) => !typeKeys[type].includes(key));
+    const ignored = Object.keys(mapping).find((key) => !mappingTypeKeys[type].includes(key));
     if (ignored !== undefined) failWith('INVALID_CONFIG', `${ignored} has no effect on a ${type} mapping`);
   }
   return type;

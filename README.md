@@ -42,6 +42,6 @@ CodeMirror provides integrated editor language services. There is no Language Se
 
 ## Verified delivery
 
-Last verified 2026-11-04 after the review run (`runs/20261103-review/`): `npm test` passes 225 tests and `npm run build` succeeds. The UI changes from that run (import, opt-in session recovery, role selector, rendered documentation, stage-diff selector, accessibility fixes) have not been exercised in a real browser; the Edge QA of 2026-11-02 predates them.
+Last verified after the review run (`runs/20261103-review/`): `npm test` passes 324 tests, `npm run build` succeeds and Prettier is clean. The built app was exercised in headless Chromium: running examples, the stage-diff selector, opt-in session recovery, case import and rejection of a bad file, the coverage dialog, editor diagnostics, and the expression workspace (whole-value `=~`, `EMPTY` on missing values), with no console errors and no requests leaving the origin. Condition, JSONPath, regex and date behaviour was compared with real Jayway JsonPath 2.9.0 and the JDK's `java.util.regex` and `java.time` in a differential review ([report](runs/20261103-review/reports/EngineReview-r1.md)); that is evidence about those libraries, not about SAP's service. Other browser engines, mobile layout and assistive-technology use have not been tested.
 
-Runtime context examples and reference-fixture guidance: [context](docs/context.md). There is no actual LSP server and no external deployment.
+Runtime context examples and reference-fixture guidance: [context](docs/context.md). There is no actual LSP server and no hosted deployment; run it locally with `npm run preview` after `npm run build`.

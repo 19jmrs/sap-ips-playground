@@ -816,6 +816,14 @@ test('manipulateDate: token subset (2-digit years, 12-hour clock, English names,
   // Quoted literals: 'T', '' (a quote) and quotes containing letters.
   assert.equal(convert("yyyy-MM-dd'T'HH:mm", "dd 'of' MMMM, ''yy", '2024-03-05T07:08'), "05 of March, '24");
   assert.throws(() => convert("yyyy-MM-dd'T", 'yyyy', '2024-03-05T'), /Unclosed quoted date literal/);
+  // Java's rule (verified against DateTimeFormatter): `''` is one quote, but `''''` is a quoted section holding one
+  // escaped quote, so also one quote; `''''''` is two. An odd run leaves a section unclosed.
+  assert.equal(convert('yyyy', "yyyy''", '2024'), "2024'");
+  assert.equal(convert('yyyy', "yyyy''''", '2024'), "2024'");
+  assert.equal(convert('yyyy', "yyyy''''''", '2024'), "2024''");
+  assert.equal(convert('yyyy', "''''yy", '2024'), "'24");
+  assert.equal(convert('yyyy', "'it''s' yyyy", '2024'), "it's 2024");
+  assert.throws(() => convert('yyyy', "yyyy'''", '2024'), /Unclosed quoted date literal/);
   // Unknown letters, unsupported widths and reserved characters are errors in both patterns.
   for (const pattern of [
     'yyyy-MM-dd T',

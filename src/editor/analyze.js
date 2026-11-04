@@ -1,12 +1,13 @@
 // Static diagnostics for transformation documents, runtime context and expressions.
-// Rules follow what src/engine/index.js accepts: "error" = the evaluator certainly fails when this part runs,
-// "warning" = uncertain or likely unintended. Nothing here claims SAP validity.
+// Rules follow what the evaluator in src/engine accepts: "error" = the evaluator certainly fails when this part
+// runs, "warning" = uncertain or likely unintended. Nothing here claims SAP validity.
 import {
   commonFunctionKeys,
   contextOperations,
   entityTypes,
   functionParameters,
   mappingKeys,
+  mappingTypeKeys,
   mappingTypes,
   parameterEnums,
   requiredParameters,
@@ -14,10 +15,12 @@ import {
 import { parseJson, propMap, stringOffset } from './json.js';
 import {
   checkCondition,
-  checkDateFormat,
+  checkDatePattern,
   checkJsonPath,
-  checkRegexSource,
+  checkManipulateDate,
+  checkRegex,
   checkTargetPath,
+  isTemplated,
   maskPlaceholders,
   startsWithPlaceholder,
 } from './syntax.js';
@@ -45,7 +48,6 @@ const SOURCE_KEYS = ['sourcePath', 'sourceVariable', 'constant'];
 
 const typeName = (node) => (node.type === 'invalid' ? 'invalid' : node.type);
 const list = (values) => values.map((value) => `"${value}"`).join(', ');
-const isTemplated = (value) => typeof value === 'string' && /\$\{[^}]+\}|%[^%\s]+%/.test(value);
 
 function distance(a, b) {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -244,11 +246,11 @@ function checkMapping(report, node, label) {
       'unsafe-name',
       `"${targetVariable.value}" is blocked as a variable name; choose another name.`,
     );
-  if (get('ignore')?.value?.value === true) return;
+  const ignored = get('ignore')?.value?.value === true;
 
   const scope = get('scope')?.value;
   if (scope) checkScope(report, scope);
-  if (get('condition')) checkConditionProp(report, get('condition'), 'condition', { blankIsError: true });
+  if (get('condition') && !ignored) checkConditionProp(report, get('condition'), 'condition', { blankIsError: true });
 
   const typeNode = get('type')?.value;
   let type = 'set';
@@ -283,6 +285,19 @@ function checkMapping(report, node, label) {
       );
     }
   }
+  // The evaluator validates every mapping, ignored or not, before it decides to skip it.
+  if (type !== 'set') {
+    for (const prop of node.props) {
+      if (prop.key.closed && mappingKeys.includes(prop.key.value) && !mappingTypeKeys[type].includes(prop.key.value))
+        report.node(
+          prop.key,
+          'error',
+          'type-key',
+          `"${prop.key.value}" has no effect on a "${type}" mapping and is rejected. Remove it or change the type.`,
+        );
+    }
+  }
+  if (ignored) return;
   const anchor = typeNode ?? node;
   const reportMissing = (code, message) => {
     if (node.incomplete) return;
@@ -366,9 +381,9 @@ function checkScope(report, scope) {
       const near = entry.type === 'string' ? closest(entry.value, contextOperations) : null;
       report.node(
         entry,
-        'warning',
+        'error',
         'scope-value',
-        `Unknown scope${entry.type === 'string' ? ` "${entry.value}"` : ''}; it never matches context.operation.${near ? ` Did you mean "${near}"?` : ''} Use ${list(contextOperations)}.`,
+        `Invalid scope${entry.type === 'string' ? ` "${entry.value}"` : ''}; the evaluator rejects it.${near ? ` Did you mean "${near}"?` : ''} Use ${list(contextOperations)}.`,
       );
     }
   }
@@ -376,9 +391,9 @@ function checkScope(report, scope) {
 
 function checkSourcePath(report, node) {
   if (!node.value && !node.closed) return;
-  const masked = maskPlaceholders(node.value);
-  const issues = checkJsonPath(masked, { startRequired: !startsWithPlaceholder(node.value) });
-  report.inString(node, issues);
+  // The engine resolves a leading placeholder before it reads the path, so its start is unknown here.
+  if (startsWithPlaceholder(node.value)) return;
+  report.inString(node, checkJsonPath(maskPlaceholders(node.value)));
 }
 
 function checkTarget(report, prop, kind, label) {
@@ -446,28 +461,18 @@ function checkValueMapping(report, node, props, reportMissing) {
     const entryProps = propMap(entry);
     const key = entryProps.get('key');
     if (!key && !entry.incomplete)
-      report.brace(entry, 'warning', 'value-mapping-key', 'This entry has no "key" array, so it can never match.');
+      report.brace(entry, 'error', 'value-mapping-key', 'This entry has no "key" array; valueMapping rejects it.');
     else if (key?.value && key.value.type !== 'array')
-      report.node(
-        key.value,
-        'warning',
-        'value-mapping-key',
-        '"key" must be an array with one value per source path; a non-array key never matches.',
-      );
+      report.node(key.value, 'error', 'value-mapping-key', '"key" must be an array with one value per source path.');
     else if (key?.value && arity !== null && key.value.items.length !== arity)
       report.node(
         key.value,
-        'warning',
+        'error',
         'value-mapping-arity',
-        `"key" has ${key.value.items.length} value${key.value.items.length === 1 ? '' : 's'} but sourcePaths has ${arity}; the tuple never matches.`,
+        `"key" has ${key.value.items.length} value${key.value.items.length === 1 ? '' : 's'} but sourcePaths has ${arity}; valueMapping rejects it.`,
       );
     if (!entryProps.get('mappedValue') && !entry.incomplete)
-      report.brace(
-        entry,
-        'warning',
-        'value-mapping-value',
-        'This entry has no "mappedValue"; a match would write nothing.',
-      );
+      report.brace(entry, 'error', 'value-mapping-value', 'This entry has no "mappedValue"; valueMapping rejects it.');
   }
 }
 
@@ -581,6 +586,39 @@ function checkFunction(report, node) {
   checkParameters(report, fn, props);
 }
 
+const SHIFT_KEYS = ['years', 'months', 'days', 'hours', 'minutes', 'seconds'];
+const DATE_PATTERN_KEYS = ['sourceDateFormat', 'targetDateFormat'];
+
+// Whole-function manipulateDate check through the engine: fields the target pattern needs but the source pattern
+// does not provide, and shifts that need a date or an hour the source lacks. Options still unknown (templated or
+// already reported as malformed) are left out; a pattern that is itself invalid was reported on its own.
+function checkManipulateDateFunction(report, props) {
+  const value = (key) => props.get(key)?.value;
+  const options = {};
+  for (const key of DATE_PATTERN_KEYS) {
+    const node = value(key);
+    if (node?.type !== 'string' || isTemplated(node.value)) continue;
+    if (checkDatePattern(node.value, key === 'sourceDateFormat' ? 'source' : 'target').length) return;
+    options[key] = node.value;
+  }
+  for (const key of SHIFT_KEYS) {
+    const node = value(key);
+    if (node?.type === 'number' && Number.isInteger(node.value)) options[key] = node.value;
+    else if (node?.type === 'string' && /^[+-]?\d{1,15}$/.test(node.value)) options[key] = node.value;
+  }
+  const problem = checkManipulateDate(options);
+  if (!problem) return;
+  const target = value(problem.key) ?? value('function') ?? value('type');
+  if (!target) return;
+  if (problem.offset !== undefined && target.type === 'string') {
+    const from = problem.offset;
+    const to = from + (problem.length ?? 1);
+    report.inString(target, [{ from, to, severity: 'error', code: 'date-format', message: problem.message }]);
+  } else {
+    report.node(target, 'error', 'date-format', problem.message);
+  }
+}
+
 function checkParameters(report, fn, props) {
   const value = (key) => props.get(key)?.value;
   for (const [key, allowed] of Object.entries(get(parameterEnums, fn) ?? {})) {
@@ -596,16 +634,12 @@ function checkParameters(report, fn, props) {
   }
   for (const key of ['regex']) {
     const node = value(key);
-    if (node?.type === 'string' && !isTemplated(node.value)) {
-      const problem = checkRegexSource(node.value);
-      if (problem) report.node(node, 'error', 'regex', problem);
-    }
+    if (node?.type === 'string' && !isTemplated(node.value)) report.inString(node, checkRegex(node.value));
   }
   for (const key of ['sourceDateFormat', 'targetDateFormat']) {
     const node = value(key);
     if (node?.type !== 'string' || isTemplated(node.value)) continue;
-    const problem = checkDateFormat(node.value);
-    if (problem) report.node(node, 'error', 'date-format', problem);
+    report.inString(node, checkDatePattern(node.value, key === 'sourceDateFormat' ? 'source' : 'target'));
   }
   if (value('locale') && value('locale').type !== 'string')
     report.node(
@@ -682,6 +716,7 @@ function checkParameters(report, fn, props) {
         );
     }
   }
+  if (fn === 'manipulateDate') checkManipulateDateFunction(report, props);
   if (fn === 'compositeId') {
     const subId = value('subId');
     if (subId?.type === 'string' && subId.value.startsWith('$') && !startsWithPlaceholder(subId.value))

@@ -11,7 +11,7 @@ Phase 0 (coordinator, done): snapshot, Prettier added and applied, shared key li
 | W2-PATHS-CONDITIONS | PathsConditions | jsonpath, conditions, util | accepted (67 tests) |
 | W2-FUNCTIONS | FunctionsSemantics | `functions/**`, dates | accepted (68 tests) |
 | W2-PIPELINE | PipelineIntegrity | transform, mapping-types, target-path, pipeline, environment | accepted; jsonpath-plus removed by coordinator |
-| W3-EDITOR-ENGINE-ALIGN | EditorEngineAlign | editor + additive engine exports | FAILED: HTTP 429 account rate limit (retry-after about 3.8 h); nothing landed; to retry |
-| W3-ENGINE-REVIEW | EngineReview | read-only review | FAILED: same 429; no report written; to retry |
+| W3-EDITOR-ENGINE-ALIGN | EditorEngineAlign, then coordinator | editor + additive engine exports | agents FAILED twice (HTTP 429); done by the coordinator: `syntax.js` wraps the engine validators, parity test added |
+| W3-ENGINE-REVIEW | EngineReview, then coordinator | read-only review | agents FAILED twice (HTTP 429); done by the coordinator against Jayway 2.9.0, Java regex/date oracles and a 25,000-iteration fuzz; 7 defects fixed, see `reports/EngineReview-r1.md` |
 
-Coordinator integration: removed `unsafePathPattern` and `jsonpath-plus`; `clone` primitive fast path; coverage.md, architecture.md, README.md, handover.md updated. Final state: 225 tests, build green, Prettier clean, browser smoke test passed. Agent reports were delivered in the conversation only; no `reports/` files were written.
+Coordinator integration: removed `unsafePathPattern` and `jsonpath-plus`; `clone` primitive fast path; coverage.md, architecture.md, README.md, handover.md updated. Final state: 324 tests, build green, Prettier clean, browser smoke test passed. Agent reports for waves 1 and 2 were delivered in the conversation only; the wave 3 report is `reports/EngineReview-r1.md`.

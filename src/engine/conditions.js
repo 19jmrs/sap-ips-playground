@@ -1,7 +1,7 @@
 import { conditionalFunction } from './condition-functions.js';
 import { located, tokenize, validationFailure } from './condition-tokenizer.js';
 import { resolvePath, validateJsonPath } from './jsonpath.js';
-import { equal, fail, isEmpty } from './util.js';
+import { equal, fail } from './util.js';
 
 // NOTE: imports jsonpath.js, which imports this module back (see the note there).
 
@@ -10,26 +10,21 @@ import { equal, fail, isEmpty } from './util.js';
 const keywordOperators = ['empty', 'size', 'in', 'nin', 'subsetof', 'anyof', 'noneof', 'contains'];
 const symbolOperators = ['==', '===', '!=', '!==', '=~', '<', '>', '<=', '>='];
 
-// Missing versus null (documented behaviour, kept from the first implementation):
+// Missing versus null, and operator semantics. Checked against Jayway JsonPath 2.9.0 (the library the SAP
+// documentation cites) with a differential run over ~4,400 filter expressions; SAP's own version is unverified:
 //   - a path that matches nothing yields `undefined`; an explicit JSON null yields `null`;
-//   - `$.x == null` is true only for an explicit null, never for a missing path (Jayway's
-//     UndefinedNode.equals is always false and NullNode only equals NullNode);
-//   - `$.x EMPTY true` is true for a missing path, null, '' and []; `EMPTY false` is its negation;
-//   - `$.x SIZE n` treats a missing path or null as size 0;
-//   - in a JSONPath filter a bare `@.x` / `$.x` operand is an existence test (`undefined` is
-//     false, every other value including null, false, 0 and '' is true), as in Jayway;
+//   - a missing operand is never equal to anything, not even another missing operand: `==` is false and `!=` true
+//     (Jayway's UndefinedNode); `$.x == null` is true only for an explicit null;
+//   - `==`, `!=`, `IN`, `CONTAINS` and the set operators treat a number and a numeric string as equal
+//     (`'1' == 1`), as Jayway's NumberNode/StringNode conversion does;
+//   - `EMPTY` and `SIZE` apply to strings and arrays only; every other left operand (number, boolean, null,
+//     missing) makes them false, so `$.x EMPTY true` is false for a missing path. An object left operand makes
+//     EMPTY fail, as Jayway raises a ClassCastException;
+//   - `NIN` and `IN` are both false when the right operand is not a list;
+//   - `=~` matches the whole value, like Java's Matcher.matches(), so `/b/` does not match 'abc';
+//   - in a JSONPath filter a bare `@.x` / `$.x` operand is an existence test (see resolvePath in jsonpath.js);
 //     outside filters a bare path operand is tested for truthiness.
-// Jayway's EmptyEvaluator/SizeEvaluator return false for a missing path and for null (and
-// SizeEvaluator for maps), but SAP's top-level (non-filter) condition behaviour is not
-// documented, so the EMPTY/SIZE rows and the bare-operand rule stay open reference cases for
-// a live IPS comparison. The official example `$.name.familyName EMPTY false` is consistent
-// with both readings.
-
-function sizeOf(value) {
-  if (value == null) return 0;
-  if (typeof value === 'string' || Array.isArray(value)) return value.length;
-  return typeof value === 'object' ? Object.keys(value).length : undefined;
-}
+// Whether SAP evaluates top-level (non-filter) conditions with the same rules is not documented.
 
 // `<`, `>`, `<=`, `>=` follow Jayway's evaluators (EvaluatorFactory.LessThanEvaluator and
 // siblings): number-with-number and string-with-string compare, string order being UTF-16 code
@@ -52,27 +47,51 @@ function regexInput(value) {
   return ['string', 'number', 'boolean'].includes(typeof value) ? String(value) : '';
 }
 
+// Java's Matcher.matches(): the pattern must cover the whole input. The anchored copies are cached per literal.
+const wholeMatchers = new WeakMap();
+
+function wholeMatcher(pattern) {
+  let matcher = wholeMatchers.get(pattern);
+  if (!matcher) {
+    matcher = new RegExp(`(?<![\\s\\S])(?:${pattern.source})(?![\\s\\S])`, pattern.flags);
+    wholeMatchers.set(pattern, matcher);
+  }
+  return matcher;
+}
+
 function matchesRegex(pattern, value) {
   if (!(pattern instanceof RegExp)) fail('Regex comparison requires /pattern/');
-  if (Array.isArray(value)) return value.some((item) => pattern.test(regexInput(item)));
-  return pattern.test(regexInput(value));
+  const matcher = wholeMatcher(pattern);
+  if (Array.isArray(value)) return value.some((item) => matcher.test(regexInput(item)));
+  return matcher.test(regexInput(value));
+}
+
+const decimal = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+function equalValues(a, b) {
+  if (a === undefined || b === undefined) return false;
+  if (typeof a === 'number' && typeof b === 'string') return decimal.test(b) && Number(b) === a;
+  if (typeof a === 'string' && typeof b === 'number') return equalValues(b, a);
+  return equal(a, b);
 }
 
 function includes(list, value) {
-  return Array.isArray(list) && list.some((item) => equal(item, value));
+  return Array.isArray(list) && list.some((item) => equalValues(item, value));
 }
 
 function compareValues(operator, a, b) {
   switch (operator) {
     case 'empty':
       if (typeof b !== 'boolean') fail('EMPTY must be followed by true or false');
-      return isEmpty(a) === b;
+      if (typeof a === 'string' || Array.isArray(a)) return (a.length === 0) === b;
+      if (a !== null && typeof a === 'object') fail('EMPTY applies to strings and arrays, not objects');
+      return false;
     case 'size':
-      return sizeOf(a) === b;
+      return (typeof a === 'string' || Array.isArray(a)) && typeof b === 'number' && a.length === b;
     case 'in':
       return includes(b, a);
     case 'nin':
-      return !includes(b, a);
+      return Array.isArray(b) && !includes(b, a);
     case 'subsetof':
       return Array.isArray(a) && Array.isArray(b) && a.every((item) => includes(b, item));
     case 'anyof':
@@ -83,11 +102,13 @@ function compareValues(operator, a, b) {
       if (Array.isArray(a)) return includes(a, b);
       return typeof a === 'string' && typeof b === 'string' && a.includes(b);
     case '==':
-    case '===':
-      return equal(a, b);
+      return equalValues(a, b);
     case '!=':
+      return !equalValues(a, b);
+    case '===':
+      return a !== undefined && b !== undefined && equal(a, b);
     case '!==':
-      return !equal(a, b);
+      return !(a !== undefined && b !== undefined && equal(a, b));
     case '=~':
       return matchesRegex(b, a);
     case '<':

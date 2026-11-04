@@ -12,10 +12,6 @@ export function clone(value) {
   return value === null || typeof value !== 'object' ? value : structuredClone(value);
 }
 
-export function isEmpty(value) {
-  return value == null || value === '' || (Array.isArray(value) && !value.length);
-}
-
 // Structural, order-independent JSON equality. Arrays compare in order, objects by key set.
 // `undefined` (a missing path) equals only `undefined`, never `null`.
 export function equal(a, b) {

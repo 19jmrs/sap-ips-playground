@@ -147,6 +147,14 @@ export const commonFunctionKeys = [
 ];
 export const entityTypes = ['user', 'group', 'role'];
 export const mappingTypes = ['set', 'remove', 'rename', 'valueMapping'];
+// Keys each non-default mapping type acts on; any other key would be silently ignored, so it is rejected.
+// `set` accepts every mapping key (its handler reports misplaced valueMapping keys itself).
+const typeCommonKeys = ['type', 'condition', 'ignore', 'scope', 'functions'];
+export const mappingTypeKeys = {
+  remove: [...typeCommonKeys, 'targetPath', 'optional'],
+  rename: [...typeCommonKeys, 'targetPath', 'constant', 'optional'],
+  valueMapping: [...typeCommonKeys, 'sourcePaths', 'valueMappings', 'targetPath', 'defaultValue', 'optional'],
+};
 export const contextOperations = ['createEntity', 'patchEntity', 'deleteEntity'];
 export const executionModes = ['source', 'target', 'chain'];
 export function detectEntityPath(data) {

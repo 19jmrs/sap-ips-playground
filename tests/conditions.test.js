@@ -31,10 +31,10 @@ test('quoted punctuation is data and cannot close groups, arrays or calls', () =
 
 test('${variable} and %property% become typed values outside literals', () => {
   assert.equal(check({ n: 5 }, '$.n == ${n}', context), true);
-  assert.equal(check({ n: '5' }, '$.n == ${n}', context), false);
+  assert.equal(check({ n: '5' }, '$.n === ${n}', context), false);
   assert.equal(check({}, '${n} > 4', context), true);
   assert.equal(check({ a: 7 }, '$.a == %q.r%', context), true);
-  assert.equal(check({ a: '7' }, '$.a == %q.r%', context), false);
+  assert.equal(check({ a: '7' }, '$.a === %q.r%', context), false);
   assert.equal(check({ s: 'abc' }, '$.s == %p%', context), true);
   assert.equal(check({ o: { a: 1, b: 2 } }, '$.o == ${obj}', context), true);
   assert.equal(check({ x: 2 }, '$.x in ${list}', context), true);
@@ -91,7 +91,12 @@ test('equality is structural and independent of object key order', () => {
   assert.equal(check({ x: { a: 1 }, y: { a: 1, b: null } }, '$.x == $.y'), false);
   assert.equal(check({ x: [1, 2], y: [2, 1] }, '$.x == $.y'), false);
   assert.equal(check(data, '$.arr == [1, 2]'), true);
-  assert.equal(check({ x: 1 }, "$.x == '1'"), false);
+  // Jayway converts a numeric string to a number for ==; === keeps the types apart.
+  assert.equal(check({ x: 1 }, "$.x == '1'"), true);
+  assert.equal(check({ x: 1 }, "$.x === '1'"), false);
+  assert.equal(check({ x: 1 }, "$.x != '1'"), false);
+  assert.equal(check({ x: 1 }, "$.x == 'one'"), false);
+  assert.equal(check({ x: 1 }, "$.x == ''"), false);
   assert.equal(check({ x: 1 }, '$.x == true'), false);
 });
 
@@ -108,21 +113,24 @@ test('IN, NIN, SUBSETOF, ANYOF, NONEOF, contains compare members structurally', 
   assert.equal(check(data, "$.tags anyof ['z', 'b']"), true);
   assert.equal(check(data, "$.tags noneof ['z']"), true);
   assert.equal(check(data, "'a' in $.tags"), true);
-  assert.equal(check({ x: 1 }, "$.x in ['1', 2]"), false);
-  // As in Jayway, a non-list right side makes IN/SUBSETOF/ANYOF/NONEOF false and NIN its negation.
+  assert.equal(check({ x: 1 }, "$.x in ['1', 2]"), true);
+  assert.equal(check({ x: 1 }, "$.x in ['one', 2]"), false);
+  // As in Jayway 2.9.0, a non-list right side makes IN, NIN, SUBSETOF, ANYOF and NONEOF all false.
   assert.equal(check(data, "'a' in 'abc'"), false);
-  assert.equal(check(data, "'a' nin 'abc'"), true);
+  assert.equal(check(data, "'a' nin 'abc'"), false);
+  assert.equal(check(data, "'a' nin ['b']"), true);
   assert.equal(check(data, '$.tags subsetof $.missing'), false);
   assert.equal(check(data, '$.tags noneof $.missing'), false);
 });
 
-test('contains needs a string for string input and never coerces', () => {
+test('contains needs a string for string input; list members compare like ==', () => {
   assert.equal(check({ s: 'hello' }, "$.s contains 'ell'"), true);
   assert.equal(check({ s: 'undefined' }, '$.s contains $.missing'), false);
   assert.equal(check({ s: 'a1b' }, '$.s contains 1'), false);
   assert.equal(check({ s: 5 }, "$.s contains '5'"), false);
   assert.equal(check({ l: [1, 2] }, '$.l contains 1'), true);
-  assert.equal(check({ l: [1, 2] }, "$.l contains '1'"), false);
+  assert.equal(check({ l: [1, 2] }, "$.l contains '1'"), true);
+  assert.equal(check({ l: [1, 2] }, "$.l contains 'one'"), false);
 });
 
 test('ordering compares number with number and string with string, anything else is false', () => {
@@ -153,15 +161,23 @@ test('missing path and explicit null are different values', () => {
   assert.equal(check(data, '$.missing == null'), false);
   assert.equal(check(data, '$.missing != null'), true);
   assert.equal(check(data, '$.n != null'), false);
-  assert.equal(check(data, '$.missing == $.alsoMissing'), true);
+  // A missing operand equals nothing, not even another missing operand (Jayway UndefinedNode).
+  assert.equal(check(data, '$.missing == $.alsoMissing'), false);
+  assert.equal(check(data, '$.missing != $.alsoMissing'), true);
+  assert.equal(check(data, '$.missing === $.alsoMissing'), false);
   assert.equal(check(data, '$.n == $.missing'), false);
-  // EMPTY treats a missing path, null, '' and [] as empty; 0 and {} are not empty.
-  for (const path of ['$.missing', '$.n', '$.e', '$.arr']) {
+  // EMPTY applies to strings and arrays; null, a missing path, numbers and booleans are neither empty nor non-empty.
+  for (const path of ['$.e', '$.arr']) {
     assert.equal(check(data, `${path} EMPTY true`), true, path);
     assert.equal(check(data, `${path} EMPTY false`), false, path);
   }
-  assert.equal(check(data, '$.zero EMPTY true'), false);
-  assert.equal(check(data, '$.o EMPTY true'), false);
+  for (const path of ['$.missing', '$.n', '$.zero']) {
+    assert.equal(check(data, `${path} EMPTY true`), false, path);
+    assert.equal(check(data, `${path} EMPTY false`), false, path);
+  }
+  assert.equal(check({ s: 'x', l: [1] }, '$.s EMPTY false'), true);
+  assert.equal(check({ s: 'x', l: [1] }, '$.l EMPTY false'), true);
+  assert.throws(() => check(data, '$.o EMPTY true'), /EMPTY applies to strings and arrays/);
   // Outside filters a bare path is a truthiness test; inside filters it is an existence test.
   assert.equal(check({ a: false }, '$.a'), false);
   assert.equal(check({ a: 0 }, '$.a'), false);
@@ -170,13 +186,15 @@ test('missing path and explicit null are different values', () => {
   assert.equal(check({ l: [{ a: null }, {}] }, '$.l[?(@.a)].length() == 1'), true);
 });
 
-test('EMPTY requires a boolean and SIZE ignores scalars that have no size', () => {
+test('EMPTY requires a boolean and SIZE applies to strings and arrays only', () => {
   assert.throws(() => check({ s: '' }, "$.s EMPTY 'true'"), /EMPTY must be followed by true or false/);
   assert.throws(() => check({ s: '' }, '$.s EMPTY 1'), /EMPTY must be followed by true or false/);
   assert.equal(check({ s: 'ab', a: [1, 2, 3], o: { x: 1 } }, '$.s SIZE 2'), true);
   assert.equal(check({ s: 'ab', a: [1, 2, 3], o: { x: 1 } }, '$.a SIZE 3'), true);
-  assert.equal(check({ s: 'ab', a: [1, 2, 3], o: { x: 1 } }, '$.o SIZE 1'), true);
+  assert.equal(check({ s: 'ab', a: [1, 2, 3], o: { x: 1 } }, '$.o SIZE 1'), false);
   assert.equal(check({ n: 5 }, '$.n SIZE 0'), false);
+  assert.equal(check({ n: null }, '$.n SIZE 0'), false);
+  assert.equal(check({}, '$.missing SIZE 0'), false);
   assert.equal(check({ b: false }, '$.b SIZE 0'), false);
 });
 
@@ -212,6 +230,17 @@ test('regex operator matches strings, numbers, booleans and list members only', 
   assert.equal(check({}, '$.missing =~ /undefined/'), false);
   assert.equal(check({ n: null }, '$.n =~ /null/'), false);
   assert.throws(() => check({ s: 'a' }, "$.s =~ 'a'"), /Regex comparison requires/);
+});
+
+test('regex operator matches the whole value, like Java Matcher.matches', () => {
+  assert.equal(check({ s: 'abc' }, '$.s =~ /b/'), false);
+  assert.equal(check({ s: 'abc' }, '$.s =~ /^b/'), false);
+  assert.equal(check({ s: 'abc' }, '$.s =~ /.*b.*/'), true);
+  assert.equal(check({ s: 'abc' }, '$.s =~ /a|ab|abc/'), true);
+  assert.equal(check({ s: 'abc' }, '$.s =~ /ABC/i'), true);
+  assert.equal(check({ s: 'a\nb' }, '$.s =~ /a.b/s'), true);
+  assert.equal(check({ s: 'a\nb' }, '$.s =~ /a/m'), false);
+  assert.equal(check({ l: ['ab', 'c'] }, '$.l =~ /a/'), false);
 });
 
 test('aggregate path methods work in comparisons and fail loudly on bad input', () => {

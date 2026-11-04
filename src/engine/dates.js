@@ -123,11 +123,8 @@ function parsePattern(format, where, output) {
   while (i < format.length) {
     const char = format[i];
     if (char === "'") {
-      if (format[i + 1] === "'") {
-        parts.push({ literal: "'" });
-        i += 2;
-        continue;
-      }
+      // Java's DateTimeFormatterBuilder rule: an opening quote, `''` pairs inside it as escaped quotes, and a single
+      // closing quote; an empty quoted section (`''`) stands for one quote. So `''''` is one quote, not two.
       const quoteStart = i;
       let literal = '';
       i++;
@@ -145,7 +142,7 @@ function parsePattern(format, where, output) {
           literal += format[i++];
         }
       }
-      parts.push({ literal });
+      parts.push({ literal: literal === '' ? "'" : literal });
     } else if (/[A-Za-z]/.test(char)) {
       let end = i;
       while (format[end] === char) end++;

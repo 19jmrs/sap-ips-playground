@@ -108,7 +108,10 @@ test('mapping type requirements follow the evaluator', () => {
   assert.ok(codes({ type: 'rename', targetPath: '$.a', constant: 5 }).includes('rename-constant'));
   assert.ok(codes({ type: 'valueMapping', targetPath: '$.a' }).includes('value-mapping'));
   assert.ok(codes({ sourcePath: '$.a', sourcePaths: ['$.b'] }).includes('needs-value-mapping'));
-  assert.deepEqual(codes({ sourcePath: '$.a', ignore: true, type: 'valueMapping' }), []);
+  // An ignored mapping is still validated: the evaluator rejects a key its type does not act on.
+  assert.deepEqual(codes({ sourcePath: '$.a', ignore: true, type: 'valueMapping' }), ['type-key']);
+  assert.deepEqual(codes({ sourcePath: '$.a', ignore: true, type: 'bogus' }), ['mapping-type']);
+  assert.deepEqual(codes({ sourcePath: '$.a[0', ignore: true }), []);
   const compact = JSON.stringify({
     user: {
       mappings: [
@@ -122,7 +125,7 @@ test('mapping type requirements follow the evaluator', () => {
     },
   });
   const arity = diagnose(compact).find((item) => item.code === 'value-mapping-arity');
-  assert.equal(arity?.severity, 'warning');
+  assert.equal(arity?.severity, 'error');
   assert.equal(arity?.text, '["x"]');
   // Only a leading randomPassword may omit the source.
   assert.deepEqual(
@@ -369,7 +372,7 @@ test('conditions in JSONPath filters are checked in place', () => {
   assert.deepEqual(diagnose(mapping({ sourcePath: '$.emails[?(@.primary == true)].value' })), []);
   assert.equal(diagnose(mapping({ sourcePath: '$.a.foo()' }))[0].code, 'jsonpath-function');
   assert.deepEqual(diagnose(mapping({ sourcePath: '$.a.length()' })), []);
-  assert.equal(diagnose(mapping({ sourcePath: '$.a[0' }))[0].severity, 'warning');
+  assert.equal(diagnose(mapping({ sourcePath: '$.a[0' }))[0].severity, 'error');
   assert.equal(diagnose(mapping({ sourcePath: '$.__proto__.a' }))[0].code, 'jsonpath-unsafe');
 });
 

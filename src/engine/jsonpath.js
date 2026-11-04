@@ -178,16 +178,30 @@ function describeType(value) {
   return typeof value;
 }
 
-function selectNames(segment, node) {
-  if (node === null || typeof node !== 'object' || Array.isArray(node)) return [];
+// `state.missing` records what Jayway's REQUIRE_PROPERTIES evaluation (the one behind a filter existence test) would
+// reject as PathNotFound: a name that is absent from an object when it ends the path or follows only definite
+// segments, a name or index applied to a non-container after only definite segments. Recursive descent never
+// rejects. Absent names and non-containers further down an indefinite path are skipped silently.
+function selectNames(segment, node, state) {
+  const isObject = node !== null && typeof node === 'object' && !Array.isArray(node);
+  if (!isObject) {
+    if (segment.upstreamDefinite && !segment.recursive) state.missing = true;
+    return [];
+  }
   const present = segment.names.filter((name) => own(node, name));
+  if (!segment.recursive && present.length < segment.names.length && (segment.leaf || segment.upstreamDefinite)) {
+    state.missing = true;
+  }
   if (segment.names.length === 1) return present.map((name) => node[name]);
   if (segment.leaf) return [Object.fromEntries(present.map((name) => [name, node[name]]))];
   return present.map((name) => node[name]);
 }
 
-function selectIndexes(segment, node) {
-  if (!Array.isArray(node)) return [];
+function selectIndexes(segment, node, state) {
+  if (!Array.isArray(node)) {
+    if (segment.upstreamDefinite && !segment.recursive) state.missing = true;
+    return [];
+  }
   const indexes = segment.kind === 'slice' ? sliceIndexes(node.length, segment) : segment.indexes;
   return indexes
     .map((index) => (index < 0 ? node.length + index : index))
@@ -204,48 +218,53 @@ function selectFiltered(segment, node, env) {
   return [];
 }
 
-function selectFrom(segment, node, env) {
+function selectFrom(segment, node, env, state) {
   switch (segment.kind) {
     case 'names':
-      return selectNames(segment, node);
+      return selectNames(segment, node, state);
     case 'wildcard':
       if (Array.isArray(node)) return node;
       return node !== null && typeof node === 'object' ? Object.values(node) : [];
     case 'filter':
       return selectFiltered(segment, node, env);
     default:
-      return selectIndexes(segment, node);
+      return selectIndexes(segment, node, state);
   }
 }
 
-function select(data, segments, env) {
+function select(data, segments, env, state) {
   let nodes = [data];
   for (const segment of segments) {
     const scope = segment.recursive ? nodes.flatMap((node) => containersOf(node)) : nodes;
-    nodes = scope.flatMap((node) => selectFrom(segment, node, env));
+    nodes = scope.flatMap((node) => selectFrom(segment, node, env, state));
   }
   return nodes;
 }
 
-// `found` is what a filter existence test `[?(@.x)]` asks: a definite path found a value
-// (null counts), an indefinite path selected at least one node.
+// `found` is what a filter existence test `[?(@.x)]` asks, as in Jayway: evaluation raised no PathNotFound (see
+// selectNames) and a definite path produced a value (null counts). An indefinite path exists even when it selected
+// nothing, e.g. `@.items[?(@.k == 9)]` over an existing array.
 export function resolvePath(data, path, env = { variables: {}, properties: {} }) {
   if (typeof path !== 'string' || !path.startsWith('$')) fail('JSONPath must start with $');
   assertSafePath(path, 'JSONPath');
 
   const method = path.match(pathMethodCall);
   if (method) {
-    const { value } = resolvePath(data, path.slice(0, -method[0].length), env);
-    const result = applyPathMethod(method[1], value);
-    return { value: result, found: result !== undefined };
+    const base = resolvePath(data, path.slice(0, -method[0].length), env);
+    const result = applyPathMethod(method[1], base.value);
+    return { value: result, found: base.found && result !== undefined };
   }
 
   // `$` inside a filter means the document root, which is the data this call started from.
   const scoped = env.rootData === undefined ? { ...env, rootData: data } : env;
   const segments = parsePath(path);
-  const nodes = select(data, segments, scoped);
-  if (segments.every((segment) => segment.definite)) return { value: nodes[0], found: nodes.length > 0 };
-  return { value: nodes, found: nodes.length > 0 };
+  const state = { missing: false };
+  const nodes = select(data, segments, scoped, state);
+  const definite = segments.every((segment) => segment.definite);
+  return {
+    value: definite ? nodes[0] : nodes,
+    found: !state.missing && (!definite || nodes.length > 0),
+  };
 }
 
 export function readPath(data, path, env) {

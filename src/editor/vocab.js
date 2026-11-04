@@ -75,17 +75,23 @@ export const commonFunctionKeyDocs = {
 export const functionDocs = {
   concatString: 'Adds optional prefix and suffix around the value.',
   replaceString: 'Literal (non-regex) replacement of every occurrence of target.',
-  replaceFirstString: 'Replaces the first match of a regex.',
-  replaceLastString: 'Replaces the last match of a regex.',
-  replaceAllString: 'Replaces every match of a regex.',
+  replaceFirstString:
+    'Replaces the first regex match. The replacement uses Java syntax ($1 for a group, \\$ for a literal $).',
+  replaceLastString:
+    'Replaces the last regex match. The replacement uses Java syntax ($1 for a group, \\$ for a literal $).',
+  replaceAllString:
+    'Replaces every regex match. The replacement uses Java syntax ($1 for a group, \\$ for a literal $).',
   toUpperCaseString: 'Upper-cases the string; optional locale such as en_EN.',
   toLowerCaseString: 'Lower-cases the string; optional locale such as en_EN.',
   substring: 'Substring from beginIndex to optional exclusive endIndex. Indices must be integers within the string.',
   splitStringToArray: 'Splits a string at a literal separator.',
   elementAt: 'Selects one member of an array input.',
-  toString: 'Converts a byte array to a UTF-8 string, otherwise stringifies the value.',
-  getMatchedRegexGroup: 'Returns capture group groupIndex of the first regex match (0 = whole match).',
-  matchRegex: 'Returns true when the regex matches the value.',
+  toString:
+    'Converts a byte array to a string by strict UTF-8 decoding (malformed bytes are an error), otherwise stringifies the value.',
+  getMatchedRegexGroup:
+    'Returns capture group groupIndex of the first regex match (0 = whole match); a group number the regex lacks is an error.',
+  matchRegex:
+    'Returns true when the regex is found in the value (substring semantics; whether SAP requires a whole-value match is unverified).',
   encode: 'Encodes a string or byte array as base32 or base64.',
   decode: 'Decodes base32 or base64 text to a byte array.',
   compositeId: 'Appends ":" and subId (a literal, or a JSONPath starting with $) to the value. Separator must be ":".',
@@ -97,10 +103,13 @@ export const functionDocs = {
   randomPassword:
     'Generates a password; needs no source. All four minimums are required and must sum to at most passwordLength.',
   convertCountryCode: 'Converts a country name or ISO code to fullName, alpha2, alpha3 or numeric.',
-  manipulateDate: 'Reformats and shifts a date using a supported Java-pattern subset (UTC arithmetic).',
+  manipulateDate:
+    'Reformats and shifts a date. Patterns are DateTimeFormatter-style (a documented subset); invalid dates are errors, offsets in the input are carried through, and there is no time-zone conversion.',
   convertCountryRegion: 'Converts country/region attributes of an object to a region name or alpha2 code.',
-  convertLocaleCode: 'Converts between ISO 639 and BCP 47 using context.localeMappings.',
-  convertTimezoneCode: 'Converts between IANA and SAP timezone codes using the bundled table.',
+  convertLocaleCode:
+    'Converts between ISO 639 and BCP 47 using context.localeMappings. An unknown value falls back to English, as documented; a debug trace marks fallbackUsed.',
+  convertTimezoneCode:
+    'Converts between IANA and SAP timezone codes using the bundled table. An unknown value falls back to Europe/Berlin or CET, as documented; a debug trace marks fallbackUsed.',
 };
 
 export const parameterDocs = {
@@ -108,7 +117,8 @@ export const parameterDocs = {
   suffix: 'Text placed after the value.',
   target: 'Literal text to replace.',
   replacement: 'Replacement text.',
-  regex: 'Regular expression; a leading (?i) enables case-insensitive matching. Java-only constructs are rejected.',
+  regex:
+    'Java regular expression, translated to JavaScript by an allow-list; unsupported constructs (lookbehind, possessive quantifiers, negative lookahead) are rejected. A leading (?i) enables case-insensitive matching.',
   locale: 'Locale such as en_EN.',
   beginIndex: 'Inclusive start index.',
   endIndex: 'Exclusive end index; defaults to the string length.',
@@ -134,8 +144,9 @@ export const parameterDocs = {
   outputFormat: 'Target representation; the accepted values depend on the function.',
   inputAttributes: 'Object member names to read, e.g. ["country", "region"].',
   outputAttribute: 'Object member that receives the converted value.',
-  sourceDateFormat: 'Java date pattern of the input, or Date(milliseconds).',
-  targetDateFormat: 'Java date pattern of the output, or Date(milliseconds); defaults to sourceDateFormat.',
+  sourceDateFormat: "Pattern of the input date, e.g. yyyy-MM-dd'T'HH:mm:ss, or Date(milliseconds).",
+  targetDateFormat:
+    'Pattern of the output date, or Date(milliseconds); defaults to sourceDateFormat. It may only use fields the source pattern provides.',
   years: 'Integer years to add.',
   months: 'Integer months to add; the day clamps to the month length.',
   days: 'Integer days to add.',
@@ -163,22 +174,23 @@ export const enumValueDocs = {
 };
 
 export const wordOperators = {
-  empty: 'path empty true/false: whether the left side is null, "" or an empty array.',
-  size: 'path size n: number of items or characters on the left side equals n.',
-  in: 'value in [list]: the left value equals one of the array members.',
-  nin: 'value nin [list]: the left value equals none of the array members.',
+  empty:
+    'path empty true/false: whether a string or array on the left side is empty. Null, missing, numbers and booleans are neither empty nor non-empty (both forms are false); an object is an error.',
+  size: 'path size n: number of items or characters of a string or array on the left side equals n. Other values are false.',
+  in: 'value in [list]: the left value equals one of the array members. False when the right side is not a list.',
+  nin: 'value nin [list]: the left value equals none of the array members. False when the right side is not a list.',
   subsetof: 'left subsetof right: every left member is in the right array.',
   anyof: 'left anyof right: at least one left member is in the right array.',
   noneof: 'left noneof right: no left member is in the right array.',
-  contains: 'left contains value: array member match or substring match.',
+  contains: 'left contains value: array member match (compared like ==) or substring match.',
 };
 
 export const symbolOperators = {
-  '==': 'Equal (JSON comparison).',
-  '===': 'Equal (same as ==).',
-  '!=': 'Not equal.',
-  '!==': 'Not equal (same as !=).',
-  '=~': 'Regex match; the right side must be a /pattern/ literal.',
+  '==': 'Equal (JSON comparison). A number equals a numeric string (1 == "1"); a missing value equals nothing, not even another missing value.',
+  '===': 'Strictly equal: no number/string conversion.',
+  '!=': 'Not equal; true whenever == is false.',
+  '!==': 'Not equal (strict).',
+  '=~': 'Regex test; the right side must be a /pattern/ literal. The pattern must match the whole value (Java matches()), so /b/ does not match "abc"; write /.*b.*/.',
   '<': 'Less than.',
   '>': 'Greater than.',
   '<=': 'Less than or equal.',
@@ -217,14 +229,14 @@ export const conditionFunctions = {
 };
 
 export const pathMethods = {
-  'length()': 'Number of members, or string length.',
+  'length()': 'Number of members, or string length; a number or boolean is an error.',
   'size()': 'Same as length().',
   'first()': 'First selected value.',
   'last()': 'Last selected value.',
-  'min()': 'Smallest selected value.',
-  'max()': 'Largest selected value.',
-  'sum()': 'Sum of the selected values.',
-  'avg()': 'Average of the selected values.',
+  'min()': 'Smallest selected value; non-numeric or empty input is an error.',
+  'max()': 'Largest selected value; non-numeric or empty input is an error.',
+  'sum()': 'Sum of the selected values; non-numeric input is an error.',
+  'avg()': 'Average of the selected values; non-numeric or empty input is an error.',
 };
 
 export const contextKeyDocs = {

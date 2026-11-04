@@ -100,7 +100,7 @@ test('filters: nested, tails, unions of tests, existence and quoted metacharacte
   assert.deepEqual(read(data, '$.list[?(@.a)].t[0]'), ['u', 'v']);
   assert.deepEqual(read(data, '$.items[?(@.id == $.sel)].sub[?(@.k > 1)]'), [{ k: 2 }]);
   assert.deepEqual(read(data, '$.items[*].sub[?(@.k >= 2)].k'), [2, 3]);
-  assert.deepEqual(read(data, '$.items[?(@.sub[?(@.k == 3)])].id'), ['y']);
+  assert.deepEqual(read(data, '$.items[?(@.sub[?(@.k == 3)])].id'), ['x', 'y']);
   assert.deepEqual(read({ l: [{ a: "it's ]) [" }, { a: 'z' }] }, '$.l[?(@.a == "it\'s ]) [")]'), [{ a: "it's ]) [" }]);
   assert.deepEqual(read({ l: [{ a: "it's ]) [" }] }, "$.l[?(@.a == 'it\\'s ]) [')]"), [{ a: "it's ]) [" }]);
 });
@@ -127,16 +127,29 @@ test('an existence test inside a filter is true for null, false, 0 and empty val
   assert.deepEqual(read({ l: [{ a: 1 }, { a: 2 }] }, '$.l[?(@.a == 1 && @.a && @.a)]'), [{ a: 1 }]);
 });
 
-test('an existence test on an indefinite path means it selects something', () => {
+test('an existence test follows Jayway: no missing property on the way, a definite path found something', () => {
   const data = {
     items: [
       { id: 'x', sub: [{ k: 1 }] },
       { id: 'y', sub: [{ k: 3 }] },
     ],
   };
-  assert.deepEqual(read(data, '$.items[?(@.sub[?(@.k == 3)])].id'), ['y']);
+  // An indefinite path that selects nothing still exists, as long as nothing on its way is missing.
+  assert.deepEqual(read(data, '$.items[?(@.sub[?(@.k == 3)])].id'), ['x', 'y']);
+  assert.deepEqual(read(data, '$.items[?(@.sub[?(@.k > 9)])].id'), ['x', 'y']);
   assert.deepEqual(read(data, '$.items[?(@.sub[*].k)].id'), ['x', 'y']);
-  assert.deepEqual(read(data, '$.items[?(@.sub[?(@.k > 9)])].id'), []);
+  assert.deepEqual(read(data, '$.items[?(@.sub[*].zz)].id'), []);
+  assert.deepEqual(read(data, '$.items[?(@.zz[*])].id'), []);
+
+  const item = { arr: [{ k: 1 }, { k: 2 }, { j: 3 }], ea: [], obj: { k: 1 }, a: 5, n: null };
+  const exists = (path) => read({ x: [item] }, `$.x[?(${path})]`).length === 1;
+  // Each expectation was taken from Jayway JsonPath 2.9.0.
+  for (const path of ['@.ea[*]', '@.ea[?(@.k)]', '@.arr[5:9]', '@..zz', '@.arr[*]', '@.arr[-1]', '@.n', '@.obj.*']) {
+    assert.equal(exists(path), true, path);
+  }
+  for (const path of ['@.arr[*].k', "@['a','m']", '@.arr[5]', '@.arr[-9]', '@.m.length()', '@.n.x', '@.a.x']) {
+    assert.equal(exists(path), false, path);
+  }
 });
 
 test('a filter on an object tests the object itself (Jayway PredicatePathToken)', () => {
