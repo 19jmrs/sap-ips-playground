@@ -112,9 +112,9 @@ function DocsContent() {
       </p>
       <ReferenceDocument title="Architecture, privacy and LSP investigation" text={architectureText} />
       <p>
-        In JSON editors, press Ctrl+Space for property/function suggestions. Format prettifies valid JSON without
-        executing it. Drag the corner of an editor to change its height, or press Expand to edit it in a larger window
-        (Close or Escape returns).
+        In JSON editors, press Ctrl+Space for property/function suggestions and Tab or Enter to accept the selected one.
+        Format prettifies valid JSON without executing it. Drag the corner of an editor to change its height, or press
+        Expand to edit it in a larger window (Close or Escape returns).
       </p>
       <p>
         A mapping with <code>targetVariable</code> (for example <code>entityIdSourceSystem</code>) stores its value in a

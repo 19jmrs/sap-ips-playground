@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { json, jsonParseLinter } from '@codemirror/lang-json';
-import { autocompletion } from '@codemirror/autocomplete';
+import { acceptCompletion, autocompletion } from '@codemirror/autocomplete';
 import { linter } from '@codemirror/lint';
-import { EditorView, hoverTooltip } from '@codemirror/view';
+import { Prec } from '@codemirror/state';
+import { EditorView, hoverTooltip, keymap } from '@codemirror/view';
 import { analyze } from '../editor/analyze.js';
 import { completionsAt } from '../editor/completions.js';
 import { documentKind } from '../editor/context.js';
@@ -161,6 +162,9 @@ export default function JsonEditor({
       ...(kind === 'expression' ? [] : [json(), linter(jsonParseLinter())]),
       lint,
       autocompletion({ override: [source] }),
+      // Enter accepts a suggestion by default; Tab does too. acceptCompletion returns false when no list is open, so
+      // Tab then does what it did before (indent, from react-codemirror's indentWithTab).
+      Prec.highest(keymap.of([{ key: 'Tab', run: acceptCompletion }])),
       hover,
       editorTheme,
       noAssist,
