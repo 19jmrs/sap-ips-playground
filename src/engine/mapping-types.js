@@ -4,7 +4,7 @@ import { applyFunction } from './functions/index.js';
 import { readPath } from './jsonpath.js';
 import { resolvePathText } from './path-text.js';
 import { pathTokens, writeAt, writePath } from './target-path.js';
-import { assertSafePath, checkKeys, clone, equal, forbidden, own } from './util.js';
+import { assertSafePath, checkKeys, clone, equal, forbidden, missingVariableMessage, own } from './util.js';
 
 // One handler per mapping `type`. Each receives the mapping, its interpolated target path
 // and a ctx = { data, env, output, record, debug }; it sets `record.status` and returns
@@ -110,7 +110,7 @@ function readSource(mapping, generated, data, env) {
   if (own(mapping, 'constant')) return interpolate(mapping.constant, env);
   if (mapping.sourceVariable !== undefined) {
     if (!own(env.variables, mapping.sourceVariable)) {
-      failWith('MISSING_CONTEXT', `Missing context variable: ${mapping.sourceVariable}`);
+      failWith('MISSING_CONTEXT', missingVariableMessage(mapping.sourceVariable));
     }
     return clone(env.variables[mapping.sourceVariable]);
   }

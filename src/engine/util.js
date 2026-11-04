@@ -4,6 +4,16 @@ export function fail(message) {
   throw new Error(message);
 }
 
+// The one text for a ${variable} / sourceVariable that is not in the environment. It says where such a value can come
+// from, because the usual cause is a variable that another stage (or nobody) set.
+export function missingVariableMessage(name) {
+  const scope =
+    name === 'entityIdSourceSystem'
+      ? 'in a source → target run a source mapping with targetVariable also sets it for the target stage'
+      : 'a variable set by the source stage is not visible to the target stage';
+  return `Missing context variable: ${name}. Supply it under "variables" in the runtime context, or set it earlier in the same stage with targetVariable (${scope}).`;
+}
+
 export function own(object, key) {
   return object != null && Object.hasOwn(object, key);
 }

@@ -1,6 +1,14 @@
 import { interpolate } from './environment.js';
 import { pathMethodName } from './path-methods.js';
-import { NEGATIVE_LOOKAHEAD_MESSAGE, fail, own, scanFilterBody, skipQuoted, unescapeQuoted } from './util.js';
+import {
+  NEGATIVE_LOOKAHEAD_MESSAGE,
+  fail,
+  missingVariableMessage,
+  own,
+  scanFilterBody,
+  skipQuoted,
+  unescapeQuoted,
+} from './util.js';
 
 // Token kinds: 'value' (literal or resolved ${variable} / %property%), 'path' ($ / @ reference),
 // 'word' (identifier or keyword operator) and 'op' (punctuation and symbolic operators).
@@ -90,7 +98,7 @@ function scanContextValue(text, start, env) {
     const name = variable[1];
     const next = start + variable[0].length;
     if (env.validate) return { token: { kind: 'value', value: undefined, placeholder: true }, next };
-    if (!own(env.variables, name)) fail(`Missing context variable: ${name}`);
+    if (!own(env.variables, name)) fail(missingVariableMessage(name));
     return { token: { kind: 'value', value: env.variables[name] }, next };
   }
   const property = rest.match(propertyPattern);

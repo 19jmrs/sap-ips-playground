@@ -1,6 +1,6 @@
 import { contextOperations } from './catalog.js';
 import { failWith, within } from './errors.js';
-import { clone, own } from './util.js';
+import { clone, missingVariableMessage, own } from './util.js';
 
 const contextObjectKeys = ['variables', 'properties', 'resolutions'];
 
@@ -38,9 +38,7 @@ export function stageEnvironment(base, inherited = {}) {
 }
 
 function variable(env, name) {
-  return own(env.variables, name)
-    ? env.variables[name]
-    : failWith('MISSING_CONTEXT', `Missing context variable: ${name}`);
+  return own(env.variables, name) ? env.variables[name] : failWith('MISSING_CONTEXT', missingVariableMessage(name));
 }
 
 function property(env, name) {
