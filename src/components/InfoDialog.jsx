@@ -117,8 +117,8 @@ function DocsContent() {
         (Close or Escape returns).
       </p>
       <p>
-        A mapping with <code>targetVariable</code> (for example <code>entityIdSourceSystem</code>) stores its value in
-        a context variable, not in the output. Those values appear in the Variables result tab.
+        A mapping with <code>targetVariable</code> (for example <code>entityIdSourceSystem</code>) stores its value in a
+        context variable, not in the output. Those values appear in the Variables result tab.
       </p>
     </>
   );
