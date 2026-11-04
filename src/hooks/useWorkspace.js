@@ -9,6 +9,7 @@ import {
   parseCaseFile,
   serializeCase,
 } from '../state/caseFile.js';
+import { contextWithOperation } from '../state/context.js';
 import { expressionRequest, pipelineRequest, safeParse } from '../state/requests.js';
 import { browserSessionStore } from '../state/session.js';
 import { initialState, isRunning, reducer } from '../state/workspace.js';
@@ -97,12 +98,21 @@ export function useWorkspace() {
     });
   }
 
+  // The operation lives in the Runtime context text; the dropdown only edits it there.
+  function setOperation(operation) {
+    const text = contextWithOperation(state.context, operation);
+    if (text === null)
+      fail('Unable to set the operation', new Error('Runtime context is not a JSON object. Fix it first.'));
+    else dispatch({ type: 'edit', field: 'context', value: text });
+  }
+
   return {
     state,
     payload,
     running,
     setField: (field, value) => dispatch({ type: 'edit', field, value }),
     setWorkspace: (workspace) => dispatch({ type: 'setWorkspace', workspace }),
+    setOperation,
     setContextOpen: (open) => dispatch({ type: 'contextToggled', open }),
     setExpressionKind: (kind) => dispatch({ type: 'setExpressionKind', kind }),
     loadExample: (id) => dispatch({ type: 'loadExample', id }),

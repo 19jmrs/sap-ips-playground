@@ -1,15 +1,17 @@
 import { useRef } from 'react';
-import { entityTypes } from '../engine/catalog.js';
+import { contextOperations, entityTypes } from '../engine/catalog.js';
 
 const LABELS = { user: 'User', group: 'Group', role: 'Role' };
 
 export default function EntityToolbar({
   entityType,
   entityPath,
+  operation,
   debug,
   running,
   onEntityType,
   onEntityPath,
+  onOperation,
   onDetect,
   onDebug,
   onImport,
@@ -30,6 +32,21 @@ export default function EntityToolbar({
           {entityTypes.map((type) => (
             <option key={type} value={type}>
               {LABELS[type] ?? type}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label title="Which scope your mappings run for. Stored as operation in the Runtime context.">
+        Operation
+        <select
+          value={operation ?? ''}
+          disabled={operation === null}
+          onChange={(event) => onOperation(event.target.value)}
+        >
+          <option value="">Not set</option>
+          {contextOperations.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>

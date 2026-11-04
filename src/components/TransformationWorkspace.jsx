@@ -1,4 +1,5 @@
 import { supportedFunctions } from '../engine/catalog.js';
+import { operationOf } from '../state/context.js';
 import ContextPanel from './ContextPanel';
 import EntityToolbar from './EntityToolbar';
 import JsonEditor from './JsonEditor';
@@ -22,10 +23,12 @@ export default function TransformationWorkspace({ workspace }) {
       <EntityToolbar
         entityType={state.entityType}
         entityPath={state.entityPath}
+        operation={operationOf(state.context)}
         debug={state.debug}
         running={running}
         onEntityType={(type) => setField('entityType', type)}
         onEntityPath={(path) => setField('entityPath', path)}
+        onOperation={actions.setOperation}
         onDetect={actions.detect}
         onDebug={(debug) => setField('debug', debug)}
         onImport={actions.importCase}

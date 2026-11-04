@@ -73,30 +73,3 @@ export function missingContext(result) {
   }
   return { variables: [...variables], operation };
 }
-
-export const CONTEXT_PLACEHOLDER = 'REPLACE_WITH_VALUE';
-
-/**
- * The runtime-context text with `variables.<name>` (and `operation`, when asked) present, so the user only has to
- * type the values. Anything already there is left as it is. Returns null when the text is not a JSON object (or
- * `variables` is not one), so the caller leaves it for the editor to report instead of overwriting the user's text.
- */
-export function contextWithMissing(text, { variables, operation }) {
-  let context;
-  try {
-    context = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-  if (!plain(context) || (context.variables !== undefined && !plain(context.variables))) return null;
-  const absent = variables.filter((name) => !(context.variables && Object.hasOwn(context.variables, name)));
-  const needsOperation = operation && context.operation === undefined;
-  if (absent.length === 0 && !needsOperation) return text;
-  const next = { ...context };
-  if (absent.length > 0) {
-    next.variables = { ...context.variables, ...Object.fromEntries(absent.map((name) => [name, CONTEXT_PLACEHOLDER])) };
-  }
-  if (needsOperation) next.operation = CONTEXT_PLACEHOLDER;
-  return JSON.stringify(next, null, 2);
-}

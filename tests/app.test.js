@@ -11,15 +11,8 @@ import {
   serializeCase,
 } from '../src/state/caseFile.js';
 import { parseInline, parseMarkdown, safeHref } from '../src/state/markdown.js';
-import {
-  CONTEXT_PLACEHOLDER,
-  changes,
-  contextWithMissing,
-  describeFailure,
-  entityLabel,
-  missingContext,
-  stageComparisons,
-} from '../src/state/results.js';
+import { changes, describeFailure, entityLabel, missingContext, stageComparisons } from '../src/state/results.js';
+import { CONTEXT_PLACEHOLDER, contextWithOperation, contextWithVariables, operationOf } from '../src/state/context.js';
 import { expressionRequest, pipelineRequest } from '../src/state/requests.js';
 import { SESSION_KEY, createSessionStore, restoreSnapshot, snapshotForStorage } from '../src/state/session.js';
 import { blankState, initialState, isRunning, reducer } from '../src/state/workspace.js';
@@ -555,23 +548,63 @@ test('missing context is read from the failed entities, and only then', () => {
   );
 });
 
-test('missing context is added to the context text without touching anything else', () => {
+test('missing variables are added to the context text without touching anything else', () => {
   const added = JSON.parse(
-    contextWithMissing('{"properties":{"p":1},"variables":{"a":1}}', { variables: ['b', 'c'], operation: true }),
+    contextWithVariables('{"operation":"patchEntity","properties":{"p":1},"variables":{"a":1}}', ['b', 'c']),
   );
   assert.deepEqual(added, {
+    operation: 'patchEntity',
     properties: { p: 1 },
     variables: { a: 1, b: CONTEXT_PLACEHOLDER, c: CONTEXT_PLACEHOLDER },
-    operation: CONTEXT_PLACEHOLDER,
   });
-  assert.deepEqual(JSON.parse(contextWithMissing('{}', { variables: ['b'], operation: false })), {
-    variables: { b: CONTEXT_PLACEHOLDER },
-  });
-  const present = '{"operation": "patchEntity", "variables": {"b": "mine"}}';
-  assert.equal(contextWithMissing(present, { variables: ['b'], operation: true }), present, 'never overwritten');
+  assert.deepEqual(JSON.parse(contextWithVariables('{}', ['b'])), { variables: { b: CONTEXT_PLACEHOLDER } });
+  const present = '{"variables": {"b": "mine"}}';
+  assert.equal(contextWithVariables(present, ['b']), present, 'an existing value is never overwritten');
   for (const unusable of ['', '{', '[]', 'null', '"x"', '{"variables": []}', '{"variables": 3}']) {
-    assert.equal(contextWithMissing(unusable, { variables: ['b'], operation: false }), null, JSON.stringify(unusable));
+    assert.equal(contextWithVariables(unusable, ['b']), null, JSON.stringify(unusable));
   }
+});
+
+test('the operation setting reads and writes operation in the context text only', () => {
+  assert.equal(operationOf('{}'), '');
+  assert.equal(operationOf('{"operation":"patchEntity"}'), 'patchEntity');
+  assert.equal(operationOf('{"operation":"nope"}'), '', 'an invalid value shows as not set; the editor flags it');
+  for (const unusable of ['', '{', '[]', 'null', '{"variables": 3}']) assert.equal(operationOf(unusable), null);
+
+  const set = contextWithOperation('{"properties":{"p":1},"variables":{"a":1}}', 'createEntity');
+  assert.deepEqual(JSON.parse(set), { properties: { p: 1 }, variables: { a: 1 }, operation: 'createEntity' });
+  assert.equal(operationOf(set), 'createEntity');
+  assert.deepEqual(JSON.parse(contextWithOperation(set, 'deleteEntity')), {
+    properties: { p: 1 },
+    variables: { a: 1 },
+    operation: 'deleteEntity',
+  });
+  assert.deepEqual(JSON.parse(contextWithOperation(set, '')), { properties: { p: 1 }, variables: { a: 1 } });
+  assert.equal(contextWithOperation('[1]', 'createEntity'), null);
+});
+
+test('the chosen operation reaches the engine and decides which scoped mappings run', () => {
+  const target = JSON.stringify({
+    user: {
+      mappings: [
+        { sourcePath: '$.id', targetPath: '$.created', scope: 'createEntity' },
+        { sourcePath: '$.id', targetPath: '$.patched', scope: 'patchEntity' },
+      ],
+    },
+  });
+  const outputFor = (operation) =>
+    runPipeline(
+      pipelineRequest({
+        ...initialState(),
+        mode: 'target',
+        data: '{"id":7}',
+        entityPath: '$',
+        target,
+        context: contextWithOperation('{}', operation),
+      }),
+    ).entities[0];
+  assert.deepEqual(outputFor('createEntity').output, { created: 7 });
+  assert.deepEqual(outputFor('patchEntity').output, { patched: 7 });
 });
 
 // A finished run whose target stage reads the given variables, with the engine's real messages.
@@ -609,12 +642,13 @@ test('a run that fails on missing context puts it in the Runtime context, once, 
   assert.equal(again.context, done.context, 'a variable that is already listed is not added twice');
 });
 
-test('a mapping scope without an operation adds operation to the Runtime context', () => {
+test('a mapping scope without an operation points at the Operation setting and leaves the context alone', () => {
   const started = apply({ ...initialState(), context: '{}' }, { type: 'runStarted', kind: 'transformation' });
   const done = reducer(started, { type: 'transformationFinished', result: scopedRun() });
-  assert.deepEqual(JSON.parse(done.context), { operation: CONTEXT_PLACEHOLDER });
-  assert.match(done.notice.message, /operation/);
-  assert.equal(done.contextOpen, true);
+  assert.equal(done.context, '{}');
+  assert.equal(done.contextOpen, false);
+  assert.match(done.notice.message, /Operation setting/);
+  assert.equal(done.stale, false);
 });
 
 test('the context is left alone when the run did not fail on missing context, was edited meanwhile, or is not an object', () => {
@@ -637,8 +671,6 @@ test('run requests refuse a placeholder that was never replaced', () => {
   const state = { ...initialState(), context: `{"variables":{"entityIdTargetSystem":"${CONTEXT_PLACEHOLDER}"}}` };
   assert.throws(() => pipelineRequest(state), /variables\.entityIdTargetSystem still has the placeholder/);
   assert.throws(() => expressionRequest(state), /variables\.entityIdTargetSystem still has the placeholder/);
-  const operation = { ...initialState(), context: `{"operation":"${CONTEXT_PLACEHOLDER}"}` };
-  assert.throws(() => pipelineRequest(operation), /operation still has the placeholder/);
   const filled = { ...state, context: '{"operation":"createEntity","variables":{"entityIdTargetSystem":"t-1"}}' };
   assert.deepEqual(pipelineRequest(filled).context, {
     operation: 'createEntity',

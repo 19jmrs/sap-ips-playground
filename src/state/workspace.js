@@ -1,5 +1,6 @@
 import { examples, pretty } from '../examples.js';
-import { contextWithMissing, missingContext } from './results.js';
+import { contextWithVariables } from './context.js';
+import { missingContext } from './results.js';
 
 // Which editable fields invalidate which result. Revisions let a run that finishes after an edit be marked stale.
 export const TRANSFORMATION_INPUTS = [
@@ -175,28 +176,28 @@ export function reducer(state, action) {
       };
     }
 
-    // A run that failed on missing context (variables, or the operation a mapping scope needs) adds it, with a
-    // placeholder value, to the Runtime context and opens it. This is not an edit: the finished run stays current, and
-    // run requests refuse a placeholder that was never replaced, so no invented value can reach a result.
+    // A run that failed on missing context says so. Missing variables are added to the Runtime context with a
+    // placeholder and the panel opens; a missing operation points at the Operation setting, because only the user
+    // knows which one to test. This is not an edit: the finished run stays current, and run requests refuse a
+    // placeholder that was never replaced, so no invented value can reach a result.
     case 'transformationFinished': {
       const { pending } = state;
       const stale = state.revision !== pending?.revision;
-      const missing = missingContext(action.result);
-      const context = stale ? null : contextWithMissing(state.context, missing);
+      const missing = stale ? { variables: [], operation: false } : missingContext(action.result);
+      const context = contextWithVariables(state.context, missing.variables);
       const added = context !== null && context !== state.context;
+      const notes = [
+        ...(added ? [`Added ${missing.variables.join(', ')} to the Runtime context with a placeholder.`] : []),
+        ...(missing.operation ? ['A mapping scope needs an operation: choose one in the Operation setting.'] : []),
+      ];
       return finishRun(state, 'transformation', {
         result: action.result,
         resultMode: pending?.mode,
         resultDebug: pending?.debug,
         stale,
-        ...(added && {
-          context,
-          contextOpen: true,
-          notice: {
-            tone: 'info',
-            title: 'Runtime context updated',
-            message: `Added ${[...missing.variables, ...(missing.operation ? ['operation'] : [])].join(', ')} to the Runtime context with a placeholder. Enter the real value, then run again.`,
-          },
+        ...(added && { context, contextOpen: true }),
+        ...(notes.length > 0 && {
+          notice: { tone: 'info', title: 'More input needed', message: `${notes.join(' ')} Then run again.` },
         }),
       });
     }
