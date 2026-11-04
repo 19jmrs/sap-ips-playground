@@ -11,7 +11,15 @@ import {
   serializeCase,
 } from '../src/state/caseFile.js';
 import { parseInline, parseMarkdown, safeHref } from '../src/state/markdown.js';
-import { changes, describeFailure, entityLabel, stageComparisons } from '../src/state/results.js';
+import {
+  VARIABLE_PLACEHOLDER,
+  changes,
+  contextWithVariable,
+  describeFailure,
+  entityLabel,
+  missingVariableName,
+  stageComparisons,
+} from '../src/state/results.js';
 import { pipelineRequest } from '../src/state/requests.js';
 import { SESSION_KEY, createSessionStore, restoreSnapshot, snapshotForStorage } from '../src/state/session.js';
 import { blankState, initialState, isRunning, reducer } from '../src/state/workspace.js';
@@ -520,4 +528,32 @@ test('the bundled docs parse into tables whose rows all match their header width
     .flatMap((table) => table.rows)
     .find((row) => row[0].children[0]?.text?.startsWith('&&'));
   assert.ok(escaped, 'the "&& / || / !" row keeps its escaped pipes inside one cell');
+});
+
+test('a missing context variable is named from the failed entity, and only then', () => {
+  const run = (mapping, mode = 'target') =>
+    runPipeline({ data: { id: 1 }, [mode]: { user: { mappings: [mapping] } }, mode }).entities[0];
+  assert.equal(
+    missingVariableName(run({ sourceVariable: 'entityIdTargetSystem', targetPath: '$.id' })),
+    'entityIdTargetSystem',
+  );
+  assert.equal(missingVariableName(run({ constant: '${a.b}', targetPath: '$.x' })), 'a.b');
+  assert.equal(missingVariableName(run({ sourcePath: '$.nope', targetPath: '$.x' })), null, 'another failure');
+  assert.equal(
+    missingVariableName(run({ constant: '%missing%', targetPath: '$.x' })),
+    null,
+    'a property, not a variable',
+  );
+  assert.equal(missingVariableName(run({ constant: 1, targetPath: '$.x' })), null, 'no failure');
+});
+
+test('the quick fix adds the variable to the context text without touching anything else', () => {
+  const added = JSON.parse(contextWithVariable('{"operation":"createEntity","variables":{"a":1}}', 'b'));
+  assert.deepEqual(added, { operation: 'createEntity', variables: { a: 1, b: VARIABLE_PLACEHOLDER } });
+  assert.deepEqual(JSON.parse(contextWithVariable('{}', 'b')), { variables: { b: VARIABLE_PLACEHOLDER } });
+  const present = '{"variables": {"b": "mine"}}';
+  assert.equal(contextWithVariable(present, 'b'), present, 'an existing value is never overwritten');
+  for (const unusable of ['', '{', '[]', 'null', '"x"', '{"variables": []}', '{"variables": 3}']) {
+    assert.equal(contextWithVariable(unusable, 'b'), null, JSON.stringify(unusable));
+  }
 });

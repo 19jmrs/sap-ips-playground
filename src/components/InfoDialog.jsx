@@ -118,7 +118,9 @@ function DocsContent() {
       </p>
       <p>
         A mapping with <code>targetVariable</code> (for example <code>entityIdSourceSystem</code>) stores its value in a
-        context variable, not in the output. Those values appear in the Variables result tab.
+        context variable, not in the output. Those values appear in the Variables result tab. Variables that IPS would
+        supply itself, such as <code>entityIdTargetSystem</code>, must be given under <code>variables</code> in the
+        Runtime context; when a run reports one missing, the failure message has a button that adds it for you.
       </p>
     </>
   );

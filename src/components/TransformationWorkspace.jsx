@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { supportedFunctions } from '../engine/catalog.js';
+import { contextWithVariable } from '../state/results.js';
 import ContextPanel from './ContextPanel';
 import EntityToolbar from './EntityToolbar';
 import JsonEditor from './JsonEditor';
@@ -9,6 +11,15 @@ import RunToolbar from './RunToolbar';
 export default function TransformationWorkspace({ workspace }) {
   const { state, payload, running, ...actions } = workspace;
   const { setField } = actions;
+  const [contextOpen, setContextOpen] = useState(false);
+
+  // Adds the missing variable to the context text and opens the panel; text that is not a context object is left
+  // for the editor to flag.
+  function supplyVariable(name) {
+    const text = contextWithVariable(state.context, name);
+    if (text !== null) setField('context', text);
+    setContextOpen(true);
+  }
   return (
     <>
       <RunToolbar
@@ -62,8 +73,16 @@ export default function TransformationWorkspace({ workspace }) {
         payload={payload}
         onChange={(value) => setField('context', value)}
         withGuidance
+        open={contextOpen}
+        onToggle={setContextOpen}
       />
-      <Results result={state.result} stale={state.stale} debug={state.resultDebug} mode={state.resultMode} />
+      <Results
+        result={state.result}
+        stale={state.stale}
+        debug={state.resultDebug}
+        mode={state.resultMode}
+        onSupplyVariable={supplyVariable}
+      />
     </>
   );
 }

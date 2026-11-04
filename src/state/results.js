@@ -56,3 +56,32 @@ export function entityLabel(entity) {
   const label = candidates.find((value) => typeof value === 'string' || typeof value === 'number');
   return label === undefined ? 'JSON entity' : String(label);
 }
+
+const MISSING_VARIABLE = /^Missing context variable: (.+?)\. Supply it under /;
+
+/** Name of the context variable a failed entity could not find, or null when it failed for another reason. */
+export function missingVariableName(entity) {
+  if (entity?.errorDetail?.code !== 'MISSING_CONTEXT') return null;
+  return MISSING_VARIABLE.exec(entity.errorDetail.message ?? '')?.[1] ?? null;
+}
+
+export const VARIABLE_PLACEHOLDER = 'REPLACE_WITH_VALUE';
+
+/**
+ * The runtime-context text with `variables.<name>` present, so the user only has to type the value. A variable that
+ * is already there is left as it is. Returns null when the text is not a JSON object (or `variables` is not one), so
+ * the caller leaves it for the editor to report instead of overwriting the user's text.
+ */
+export function contextWithVariable(text, name) {
+  let context;
+  try {
+    context = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (!plain(context) || (context.variables !== undefined && !plain(context.variables))) return null;
+  if (context.variables && Object.hasOwn(context.variables, name)) return text;
+  const variables = { ...context.variables, [name]: VARIABLE_PLACEHOLDER };
+  return JSON.stringify({ ...context, variables }, null, 2);
+}

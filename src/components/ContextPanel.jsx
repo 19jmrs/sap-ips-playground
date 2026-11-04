@@ -1,8 +1,10 @@
 import JsonEditor from './JsonEditor';
 
-export default function ContextPanel({ value, payload, onChange, withGuidance }) {
+// `open` / `onToggle` are optional: pass them to let the page open the panel (for example after a quick fix);
+// without them the disclosure manages itself.
+export default function ContextPanel({ value, payload, onChange, withGuidance, open, onToggle }) {
   return (
-    <details className="context-disclosure">
+    <details className="context-disclosure" open={open} onToggle={onToggle && ((event) => onToggle(event.target.open))}>
       <summary>
         Runtime context
         {withGuidance ? <span>User supplied · optional</span> : null}
