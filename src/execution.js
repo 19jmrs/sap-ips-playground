@@ -6,7 +6,9 @@ export const TIMEOUT_MS = 5_000;
 export const INPUT_LIMIT_MESSAGE = 'This run exceeds the 5 MB workspace input limit. Reduce the batch size.';
 export const TIMEOUT_MESSAGE =
   'Execution exceeded 5 seconds and was stopped. Reduce the batch or simplify the expression.';
-export const WORKER_FAILED_MESSAGE = 'The execution worker failed. Review the input and try again.';
+// A worker also fails when its script cannot be loaded, which is what an open tab sees after the app was rebuilt.
+export const WORKER_FAILED_MESSAGE =
+  'The execution worker failed. Reload the page (Ctrl+F5) in case it is an old copy from before an update; if it still fails, review the input and try again.';
 
 // Counts UTF-8 bytes without allocating an encoded copy of a potentially multi-megabyte string.
 export function utf8ByteLength(text) {
