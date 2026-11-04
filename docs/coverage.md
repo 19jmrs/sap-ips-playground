@@ -103,7 +103,7 @@ Statuses: **local** = evaluator route exists; **bounded** = deliberately restric
 | currentDate | bounded | Caller-supplied deterministic date; no fabricated IPS date context. |
 | assignGroup | metadata | Variable output intent; no group assignment. |
 | unassignGroup | metadata | Variable output intent; no group unassignment. |
-| Custom variables | local | Per entity and stage scope. |
+| Custom variables | local | Per entity and stage scope. `entityIdSourceSystem` set by a source stage is also readable in the target stage of the same entity (bounded: SAP's exact exposure to write transformations unverified). |
 | System properties | bounded | Explicit caller-supplied values. |
 | Resolution state | bounded | Explicit caller-supplied IDs; cross-system selector semantics require fixtures. |
 | Missing external context | local | Diagnostic/error instead of simulated result. |

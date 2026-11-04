@@ -760,3 +760,54 @@ test('a run in which no mapping sets a variable reports none, and supplied conte
   assert.equal('sourceVariables' in entity, false);
   assert.equal('targetVariables' in entity, false);
 });
+
+test('entityIdSourceSystem set by the source stage is readable in the target stage of the same entity only', () => {
+  const read = (context) =>
+    runPipeline({
+      data: [{ id: 'u-1' }, { id: 'u-2' }],
+      source: doc(
+        { sourcePath: '$.id', targetVariable: 'entityIdSourceSystem' },
+        { sourcePath: '$.id', targetVariable: 'custom' },
+      ),
+      target: doc(
+        { sourceVariable: 'entityIdSourceSystem', targetPath: '$.externalId' },
+        { constant: 'id=${entityIdSourceSystem}', targetPath: '$.note' },
+      ),
+      mode: 'chain',
+      context,
+    });
+  const result = read({});
+  assert.deepEqual(
+    result.entities.map((entity) => entity.output),
+    [
+      { externalId: 'u-1', note: 'id=u-1' },
+      { externalId: 'u-2', note: 'id=u-2' },
+    ],
+    'each entity sees its own id',
+  );
+  assert.deepEqual(result.entities[1].sourceVariables, { entityIdSourceSystem: 'u-2', custom: 'u-2' });
+
+  // The source stage's value wins over a supplied one, and the caller's context is untouched.
+  const context = { variables: { entityIdSourceSystem: 'supplied' } };
+  assert.equal(first(read(context)).output.externalId, 'u-1');
+  assert.deepEqual(context, { variables: { entityIdSourceSystem: 'supplied' } });
+
+  // Other variables stay local to the stage that set them.
+  const leak = runPipeline({
+    data: { id: 'u-1' },
+    source: doc({ sourcePath: '$.id', targetVariable: 'custom' }),
+    target: doc({ sourceVariable: 'custom', targetPath: '$.x' }),
+    mode: 'chain',
+  });
+  assert.match(first(leak).error, /Missing context variable: custom/);
+
+  // Without a source stage that sets it, the target stage still needs it supplied.
+  const absent = runPipeline({
+    data: { id: 'u-1' },
+    source: doc({ sourcePath: '$.id', targetPath: '$.id' }),
+    target: doc({ sourceVariable: 'entityIdSourceSystem', targetPath: '$.x' }),
+    mode: 'chain',
+  });
+  assert.match(first(absent).error, /Missing context variable: entityIdSourceSystem/);
+  assert.equal(first(absent).errorDetail.stage, 'target');
+});

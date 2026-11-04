@@ -18,7 +18,7 @@ Open Runtime context and supply a JSON object. Only provide values from the inte
 
 These are fictional fixtures, including the illustrative locale pairs; this is not SAP's complete default-language master data. Locale conversion needs the intended authoritative ordered ISO639/BCP47 pairs. Missing required tables/variables/properties produce errors.
 
-Use `${entityIdTargetSystem}` for variable interpolation and `%domain%` for property interpolation. `sourceVariable` and `targetVariable` read/write local variables. Each entity and stage starts with a fresh copy of supplied context; variables created by source mappings do not implicitly leak to target mappings.
+Use `${entityIdTargetSystem}` for variable interpolation and `%domain%` for property interpolation. `sourceVariable` and `targetVariable` read/write local variables. Each entity and stage starts with a fresh copy of supplied context; variables created by source mappings do not implicitly leak to target mappings, with one exception: in a source → target run, `entityIdSourceSystem` set by a source mapping (`{"sourcePath": "$.id", "targetVariable": "entityIdSourceSystem"}`) is readable in the target stage of the same entity, and overrides a supplied value of that name. In a target-only run, supply it under `variables` in the runtime context.
 
 `operation` selects local scope rules only. It sends no create, patch or delete request. `resolveEntityIds` reads `resolutions.user`/`resolutions.group`, or a table under the key `sourceSystemName|targetSystemName|entityType`. Missing IDs fail rather than being fabricated.
 

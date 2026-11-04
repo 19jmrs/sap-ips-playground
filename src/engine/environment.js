@@ -31,9 +31,10 @@ export function environment(context = {}) {
 // Per-entity, per-stage environment. Only `variables` is written to during a run (targetVariable),
 // so only that map is fresh; properties, resolutions and locale mappings are read-only and shared,
 // which keeps a batch from re-copying the whole context for every entity and stage.
-// `written` collects just the variables a mapping set, so a run can show them (see runPipeline).
-export function stageEnvironment(base) {
-  return { ...base, variables: { ...base.variables }, written: {} };
+// `inherited` are variables the previous stage of the same entity hands on (see runEntity); they sit on top of the
+// supplied context. `written` collects just the variables a mapping set, so a run can show them.
+export function stageEnvironment(base, inherited = {}) {
+  return { ...base, variables: { ...base.variables, ...inherited }, written: {} };
 }
 
 function variable(env, name) {

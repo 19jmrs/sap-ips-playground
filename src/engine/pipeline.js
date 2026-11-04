@@ -5,7 +5,8 @@
 //     error?, errorDetail? }
 // and never throws for a per-entity problem: the failure is recorded on the entity instead.
 // `<stage>Variables` holds the context variables that stage's mappings set with targetVariable (name -> value);
-// it is absent when none did. Variables are per stage and entity and are not passed on to the next stage.
+// it is absent when none did. Variables are per stage and entity; only `entityIdSourceSystem`, set by a source
+// stage, is handed on to the target stage of the same entity.
 //
 //   error        string shown to users, e.g. "source mapping 2: Required source value missing: $.a".
 //   errorDetail  the same failure as data (additive; present exactly when `error` is):
@@ -31,7 +32,12 @@ import { IpsError, classify, failWith, within } from './errors.js';
 import { readPath } from './jsonpath.js';
 import { resolvePathText } from './path-text.js';
 import { transform } from './transform.js';
-import { clone } from './util.js';
+import { clone, own } from './util.js';
+
+// The one variable a source stage hands to the target stage of the same entity. SAP documents it as the entity's
+// identity, set by the read transformation (`targetVariable: entityIdSourceSystem`) and kept by IPS. Every other
+// variable is local to the stage that set it.
+const identityVariable = 'entityIdSourceSystem';
 
 // Runs every selected stage for one entity. Errors are captured on the returned entity so a
 // failing entity never aborts the batch.
@@ -43,11 +49,12 @@ function runEntity(input, index, { source, target, mode, entityType, baseEnv, de
       failWith('ENTITY_INVALID', 'Entity must be a JSON object');
     }
     let current = clone(input);
+    const inherited = {};
     for (const stage of mode === 'chain' ? ['source', 'target'] : [mode]) {
       const document = stage === 'source' ? source : target;
       if (!document) throw new IpsError('INVALID_CONFIG', `Missing ${stage} transformation`, { stage });
-      // Fresh variables per stage: they never leak between stages or entities.
-      const stageEnv = stageEnvironment(baseEnv);
+      // Fresh variables per stage and entity, plus the identity handed on by the previous stage.
+      const stageEnv = stageEnvironment(baseEnv, inherited);
       const result = transform(current, document, entityType, stageEnv, entity.trace, stage, debug);
       if (result.skipped) {
         entity.skipped = true;
@@ -56,6 +63,9 @@ function runEntity(input, index, { source, target, mode, entityType, baseEnv, de
       current = result.output;
       entity[stage + 'Output'] = clone(current);
       if (Object.keys(stageEnv.written).length) entity[stage + 'Variables'] = stageEnv.written;
+      if (stage === 'source' && own(stageEnv.written, identityVariable)) {
+        inherited[identityVariable] = clone(stageEnv.written[identityVariable]);
+      }
     }
     entity.output = current;
   } catch (error) {

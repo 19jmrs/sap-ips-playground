@@ -107,7 +107,7 @@ Official conditions demonstrate `&&`, `||`, parentheses, comparisons, `contains`
 | `assignGroup` | Target-variable intent; no group assignment side effect in this app. |
 | `unassignGroup` | Target-variable intent (often delete scope); no group side effect in this app. |
 
-Custom local variables are also allowed. Variables created in a source stage must not automatically become target-system variables; independent stage context and per-entity reset are required.
+Custom local variables are also allowed. Variables created in a source stage do not automatically become target-stage variables; independent stage context and per-entity reset are required. The exception is `entityIdSourceSystem`: SAP documents it as the entity's identity, set by the read transformation (`targetVariable`) and kept by IPS, so this app hands it from the source stage to the target stage of the same entity. Whether SAP exposes it to write transformations in exactly this way is not verified.
 
 ## Reference cases to preserve
 

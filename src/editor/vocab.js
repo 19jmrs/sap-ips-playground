@@ -240,7 +240,8 @@ export const pathMethods = {
 };
 
 export const contextKeyDocs = {
-  variables: 'Named values scoped to one entity and one stage; read with sourceVariable or ${name}.',
+  variables:
+    'Named values scoped to one entity and one stage; read with sourceVariable or ${name}. In a source → target run, entityIdSourceSystem set by the source stage is also visible to the target stage.',
   properties: 'Explicit system property values used by %property% substitution.',
   operation:
     'Explicit local scope selection (createEntity, patchEntity, deleteEntity); no remote operation is performed.',
@@ -250,7 +251,8 @@ export const contextKeyDocs = {
 
 // Names documented in docs/ips-inventory.md (special variables) and used by the conditional functions.
 export const knownVariables = {
-  entityIdSourceSystem: 'Source/proxy read identity selection; may be set by a mapping.',
+  entityIdSourceSystem:
+    'The entity id from the source system; set by a source mapping (targetVariable). Readable in the target stage of a chained run; otherwise supply it in context.',
   entityIdTargetSystem: 'Target/proxy identity; supplied by the caller in this app.',
   entityBaseLocation: 'Proxy entity endpoint base URL, supplied by the caller.',
   entityLocationSourceSystem: 'Proxy entity location, can be constructed from variables.',
