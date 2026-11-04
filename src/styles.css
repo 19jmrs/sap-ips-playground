@@ -347,11 +347,48 @@ select {
   color: #32659b;
   letter-spacing: 0.2px;
 }
-.format-button {
+.panel-actions {
   margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.panel-actions .small-button {
   font-size: 10px;
   min-height: 25px;
   padding: 3px 11px;
+}
+/* The height prop sets the starting height; the drag handle in the corner changes it. */
+.editor-body {
+  resize: vertical;
+  overflow: hidden;
+  min-height: 90px;
+  max-height: 90vh;
+}
+.editor-dialog {
+  background: #fff;
+  border-radius: 9px;
+  box-shadow: 0 15px 60px #00162c33;
+  width: min(1280px, 100%);
+  height: min(900px, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.editor-dialog .panel-heading {
+  flex: none;
+}
+.editor-dialog .panel-heading h3 {
+  font-size: 15px;
+}
+.editor-dialog-body {
+  flex: 1;
+  min-height: 0;
+}
+.editor-dialog .cm-editor {
+  font-size: 14px;
+}
+.editor-dialog .inline-error {
+  flex: none;
 }
 .cm-editor .cm-scroller {
   scrollbar-width: thin;
@@ -901,7 +938,7 @@ footer button {
   .language-tag {
     display: none;
   }
-  .format-button {
+  .panel-actions .small-button {
     padding: 3px 7px;
   }
   .toolbar-spacer {
@@ -1010,12 +1047,6 @@ footer button {
   }
   .language-tag {
     display: block;
-  }
-  .editors-grid .cm-editor {
-    height: auto;
-  }
-  .editors-grid .cm-scroller {
-    max-height: 265px;
   }
   .context-disclosure {
     margin-bottom: 17px;

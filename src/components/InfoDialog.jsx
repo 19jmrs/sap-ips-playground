@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import coverageText from '../../docs/coverage.md?raw';
 import inventoryText from '../../docs/ips-inventory.md?raw';
 import architectureText from '../../docs/architecture.md?raw';
+import { useModal } from '../hooks/useModal';
 import Markdown from './Markdown';
 
 const TITLES = {
@@ -9,8 +10,6 @@ const TITLES = {
   privacy: 'Your data stays in this tab',
   docs: 'Using the playground',
 };
-
-const FOCUSABLE = 'button,a[href],input,select,textarea,summary,[tabindex="0"]';
 
 function ReferenceDocument({ title, text }) {
   return (
@@ -114,7 +113,12 @@ function DocsContent() {
       <ReferenceDocument title="Architecture, privacy and LSP investigation" text={architectureText} />
       <p>
         In JSON editors, press Ctrl+Space for property/function suggestions. Format prettifies valid JSON without
-        executing it.
+        executing it. Drag the corner of an editor to change its height, or press Expand to edit it in a larger window
+        (Close or Escape returns).
+      </p>
+      <p>
+        A mapping with <code>targetVariable</code> (for example <code>entityIdSourceSystem</code>) stores its value in
+        a context variable, not in the output. Those values appear in the Variables result tab.
       </p>
     </>
   );
@@ -122,38 +126,7 @@ function DocsContent() {
 
 export default function InfoDialog({ kind, keepOnReload, onClose }) {
   const dialogRef = useRef(null);
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  });
-
-  // Runs once per open: remembers the opener, moves focus in, traps Tab, and hands focus back on close.
-  useEffect(() => {
-    const previous = document.activeElement;
-    // Content inside closed <details> has no layout box and cannot take focus.
-    const focusable = () =>
-      [...dialogRef.current.querySelectorAll(FOCUSABLE)].filter((element) => element.getClientRects().length > 0);
-    focusable()[0]?.focus();
-    function keydown(event) {
-      if (event.key === 'Escape') closeRef.current();
-      if (event.key !== 'Tab') return;
-      const elements = focusable();
-      const first = elements[0];
-      const last = elements.at(-1);
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    }
-    document.addEventListener('keydown', keydown);
-    return () => {
-      document.removeEventListener('keydown', keydown);
-      previous?.focus();
-    };
-  }, []);
+  useModal(dialogRef, onClose);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

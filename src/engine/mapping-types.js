@@ -193,7 +193,10 @@ export function setMapping(mapping, path, ctx) {
     value = fallback.value;
   }
 
-  if (mapping.targetVariable !== undefined) env.variables[mapping.targetVariable] = clone(value);
+  if (mapping.targetVariable !== undefined) {
+    env.variables[mapping.targetVariable] = clone(value);
+    env.written[mapping.targetVariable] = clone(value);
+  }
   const output = path === undefined ? ctx.output : within('PATH_ERROR', () => writePath(ctx.output, path, value));
   recordWritten(ctx, value);
   return output;

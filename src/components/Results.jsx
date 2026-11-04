@@ -6,6 +6,7 @@ import { changes, describeFailure, entityLabel, stageComparisons } from '../stat
 const TABS = [
   ['source', 'After source'],
   ['target', 'After target'],
+  ['variables', 'Variables'],
   ['changes', 'Changes'],
   ['trace', 'Trace'],
 ];
@@ -18,6 +19,15 @@ function Display({ value, label }) {
   ) : (
     <JsonEditor title="Output" value={pretty(value)} readOnly height="275px" />
   );
+}
+
+// Context variables a mapping set with `targetVariable`, grouped by the stage that set them.
+function variablesOf(entity) {
+  if (!entity?.sourceVariables && !entity?.targetVariables) return undefined;
+  return {
+    ...(entity.sourceVariables && { source: entity.sourceVariables }),
+    ...(entity.targetVariables && { target: entity.targetVariables }),
+  };
 }
 
 function entityStatus(item) {
@@ -244,6 +254,12 @@ export default function Results({ result, stale, debug, mode }) {
               ) : null}
               {selectedTab === 'target' ? (
                 <Display value={entity?.targetOutput} label="No target output is available for this entity." />
+              ) : null}
+              {selectedTab === 'variables' ? (
+                <Display
+                  value={variablesOf(entity)}
+                  label="No mapping set a context variable. A mapping with targetVariable (for example entityIdSourceSystem) stores its value there instead of in the output, so it never appears under After source or After target."
+                />
               ) : null}
               {selectedTab === 'changes' && entity ? (
                 <ChangesView entity={entity} stage={stage} onStage={setStage} />

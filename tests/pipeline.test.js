@@ -736,3 +736,27 @@ test('the engine never mutates its inputs, document or context', () => {
   assert.equal(JSON.stringify({ data, source, context }), snapshot);
   assert.deepEqual(first(result).output, { list: [{ v: 'x' }] });
 });
+
+test('variables a mapping sets with targetVariable are reported per stage and stay out of the output', () => {
+  const entity = first(
+    runPipeline({
+      data: { id: 'u-1', name: 'Alex' },
+      source: doc(
+        { sourcePath: '$.id', targetVariable: 'entityIdSourceSystem' },
+        { sourcePath: '$.name', targetPath: '$.n' },
+      ),
+      target: doc({ sourcePath: '$.n', targetPath: '$.n', targetVariable: 'seen' }),
+      mode: 'chain',
+      context: { variables: { entityIdTargetSystem: 'target-42' } },
+    }),
+  );
+  assert.deepEqual(entity.output, { n: 'Alex' });
+  assert.deepEqual(entity.sourceVariables, { entityIdSourceSystem: 'u-1' });
+  assert.deepEqual(entity.targetVariables, { seen: 'Alex' }, 'a stage does not inherit the previous stage variables');
+});
+
+test('a run in which no mapping sets a variable reports none, and supplied context variables are not echoed', () => {
+  const entity = first(run({ a: 1 }, [{ sourcePath: '$.a', targetPath: '$.a' }], { context: { variables: { v: 1 } } }));
+  assert.equal('sourceVariables' in entity, false);
+  assert.equal('targetVariables' in entity, false);
+});

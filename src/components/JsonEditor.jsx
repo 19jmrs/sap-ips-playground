@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { json, jsonParseLinter } from '@codemirror/lang-json';
 import { autocompletion } from '@codemirror/autocomplete';
@@ -8,6 +9,7 @@ import { analyze } from '../editor/analyze.js';
 import { completionsAt } from '../editor/completions.js';
 import { documentKind } from '../editor/context.js';
 import { hoverAt } from '../editor/hover.js';
+import { useModal } from '../hooks/useModal';
 
 const editorTheme = EditorView.theme({
   '&': { fontSize: '12px', backgroundColor: '#fff', color: '#12223c' },
@@ -31,6 +33,67 @@ const noAssist = EditorView.contentAttributes.of({
   'data-enable-grammarly': 'false',
 });
 
+// A larger copy of one editor, centred over the page. It edits the same value as the panel it came from; the panel
+// stays mounted underneath (and inert) so its scroll position and undo history survive.
+function ExpandedEditor({
+  title,
+  expressionMode,
+  readOnly,
+  value,
+  onChange,
+  extensions,
+  onFormat,
+  formatError,
+  onClose,
+}) {
+  const dialogRef = useRef(null);
+  useModal(dialogRef, onClose, { isolate: true });
+  return createPortal(
+    <div className="modal-backdrop">
+      <section
+        ref={dialogRef}
+        className="editor-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${title} (expanded)`}
+      >
+        <div className="panel-heading">
+          <h3>{title}</h3>
+          <span className="language-tag">{expressionMode ? 'EXPR' : 'JSON'}</span>
+          <div className="panel-actions">
+            {!readOnly && !expressionMode ? (
+              <button className="small-button format-button" onClick={onFormat}>
+                Format
+              </button>
+            ) : null}
+            <button className="small-button" onClick={onClose} aria-label={`Close expanded ${title}`}>
+              ✕ Close
+            </button>
+          </div>
+        </div>
+        <div className="editor-dialog-body">
+          <CodeMirror
+            value={value ?? ''}
+            onChange={onChange}
+            extensions={extensions}
+            height="100%"
+            autoFocus
+            readOnly={readOnly}
+            basicSetup={{ foldGutter: true, highlightActiveLine: !readOnly, autocompletion: false }}
+            aria-label={`${title} expanded editor`}
+          />
+        </div>
+        {formatError ? (
+          <div className="inline-error" role="alert">
+            {formatError}
+          </div>
+        ) : null}
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
 export default function JsonEditor({
   title,
   value,
@@ -43,6 +106,7 @@ export default function JsonEditor({
   expressionMode = false,
 }) {
   const [formatError, setFormatError] = useState('');
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => setFormatError(''), [value]);
   const kind = documentKind({ title, transformation, expressionMode });
   // Services read the latest payload/functions through a ref so typing in one editor does not reconfigure another.
@@ -117,25 +181,50 @@ export default function JsonEditor({
       <div className="panel-heading">
         <h3>{title}</h3>
         <span className="language-tag">{expressionMode ? 'EXPR' : 'JSON'}</span>
-        {!readOnly && !expressionMode ? (
-          <button className="small-button format-button" onClick={format}>
-            Format
+        <div className="panel-actions">
+          {!readOnly && !expressionMode ? (
+            <button className="small-button format-button" onClick={format}>
+              Format
+            </button>
+          ) : null}
+          <button
+            className="small-button expand-button"
+            onClick={() => setExpanded(true)}
+            aria-haspopup="dialog"
+            aria-label={`Expand ${title}`}
+          >
+            ⤢ Expand
           </button>
-        ) : null}
+        </div>
       </div>
-      <CodeMirror
-        value={value ?? ''}
-        onChange={onChange}
-        extensions={extensions}
-        height={height}
-        readOnly={readOnly}
-        basicSetup={{ foldGutter: true, highlightActiveLine: !readOnly, autocompletion: false }}
-        aria-label={`${title} editor`}
-      />
+      <div className="editor-body" style={{ height }}>
+        <CodeMirror
+          value={value ?? ''}
+          onChange={onChange}
+          extensions={extensions}
+          height="100%"
+          readOnly={readOnly}
+          basicSetup={{ foldGutter: true, highlightActiveLine: !readOnly, autocompletion: false }}
+          aria-label={`${title} editor`}
+        />
+      </div>
       {formatError ? (
         <div className="inline-error" role="alert">
           {formatError}
         </div>
+      ) : null}
+      {expanded ? (
+        <ExpandedEditor
+          title={title}
+          expressionMode={expressionMode}
+          readOnly={readOnly}
+          value={value}
+          onChange={onChange}
+          extensions={extensions}
+          onFormat={format}
+          formatError={formatError}
+          onClose={() => setExpanded(false)}
+        />
       ) : null}
     </section>
   );

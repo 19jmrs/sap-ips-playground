@@ -1,8 +1,11 @@
 // Pipeline entry points.
 //
 // runPipeline() returns { entities, summary }. Every entity is
-//   { index, input, trace, output?, sourceOutput?, targetOutput?, skipped?, error?, errorDetail? }
+//   { index, input, trace, output?, sourceOutput?, targetOutput?, sourceVariables?, targetVariables?, skipped?,
+//     error?, errorDetail? }
 // and never throws for a per-entity problem: the failure is recorded on the entity instead.
+// `<stage>Variables` holds the context variables that stage's mappings set with targetVariable (name -> value);
+// it is absent when none did. Variables are per stage and entity and are not passed on to the next stage.
 //
 //   error        string shown to users, e.g. "source mapping 2: Required source value missing: $.a".
 //   errorDetail  the same failure as data (additive; present exactly when `error` is):
@@ -44,13 +47,15 @@ function runEntity(input, index, { source, target, mode, entityType, baseEnv, de
       const document = stage === 'source' ? source : target;
       if (!document) throw new IpsError('INVALID_CONFIG', `Missing ${stage} transformation`, { stage });
       // Fresh variables per stage: they never leak between stages or entities.
-      const result = transform(current, document, entityType, stageEnvironment(baseEnv), entity.trace, stage, debug);
+      const stageEnv = stageEnvironment(baseEnv);
+      const result = transform(current, document, entityType, stageEnv, entity.trace, stage, debug);
       if (result.skipped) {
         entity.skipped = true;
         return entity;
       }
       current = result.output;
       entity[stage + 'Output'] = clone(current);
+      if (Object.keys(stageEnv.written).length) entity[stage + 'Variables'] = stageEnv.written;
     }
     entity.output = current;
   } catch (error) {
