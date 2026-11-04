@@ -120,7 +120,9 @@ function DocsContent() {
         A mapping with <code>targetVariable</code> (for example <code>entityIdSourceSystem</code>) stores its value in a
         context variable, not in the output. Those values appear in the Variables result tab. Variables that IPS would
         supply itself, such as <code>entityIdTargetSystem</code>, must be given under <code>variables</code> in the
-        Runtime context; when a run reports one missing, the failure message has a button that adds it for you.
+        Runtime context. When a run reports one missing, the app adds it there with the placeholder{' '}
+        <code>REPLACE_WITH_VALUE</code> and opens the box; enter the real value and run again. A run is refused while a
+        placeholder is still in place.
       </p>
     </>
   );

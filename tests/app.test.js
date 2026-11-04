@@ -14,13 +14,14 @@ import { parseInline, parseMarkdown, safeHref } from '../src/state/markdown.js';
 import {
   VARIABLE_PLACEHOLDER,
   changes,
-  contextWithVariable,
+  contextWithVariables,
   describeFailure,
   entityLabel,
   missingVariableName,
+  missingVariableNames,
   stageComparisons,
 } from '../src/state/results.js';
-import { pipelineRequest } from '../src/state/requests.js';
+import { expressionRequest, pipelineRequest } from '../src/state/requests.js';
 import { SESSION_KEY, createSessionStore, restoreSnapshot, snapshotForStorage } from '../src/state/session.js';
 import { blankState, initialState, isRunning, reducer } from '../src/state/workspace.js';
 
@@ -547,13 +548,70 @@ test('a missing context variable is named from the failed entity, and only then'
   assert.equal(missingVariableName(run({ constant: 1, targetPath: '$.x' })), null, 'no failure');
 });
 
-test('the quick fix adds the variable to the context text without touching anything else', () => {
-  const added = JSON.parse(contextWithVariable('{"operation":"createEntity","variables":{"a":1}}', 'b'));
-  assert.deepEqual(added, { operation: 'createEntity', variables: { a: 1, b: VARIABLE_PLACEHOLDER } });
-  assert.deepEqual(JSON.parse(contextWithVariable('{}', 'b')), { variables: { b: VARIABLE_PLACEHOLDER } });
+test('missing variables are added to the context text without touching anything else', () => {
+  const added = JSON.parse(contextWithVariables('{"operation":"createEntity","variables":{"a":1}}', ['b', 'c']));
+  assert.deepEqual(added, {
+    operation: 'createEntity',
+    variables: { a: 1, b: VARIABLE_PLACEHOLDER, c: VARIABLE_PLACEHOLDER },
+  });
+  assert.deepEqual(JSON.parse(contextWithVariables('{}', ['b'])), { variables: { b: VARIABLE_PLACEHOLDER } });
   const present = '{"variables": {"b": "mine"}}';
-  assert.equal(contextWithVariable(present, 'b'), present, 'an existing value is never overwritten');
+  assert.equal(contextWithVariables(present, ['b']), present, 'an existing value is never overwritten');
   for (const unusable of ['', '{', '[]', 'null', '"x"', '{"variables": []}', '{"variables": 3}']) {
-    assert.equal(contextWithVariable(unusable, 'b'), null, JSON.stringify(unusable));
+    assert.equal(contextWithVariables(unusable, ['b']), null, JSON.stringify(unusable));
   }
+});
+
+// A finished run for one entity per message; `error` carries the engine message exactly as a real run does.
+const missingRun = (state, ...names) =>
+  runPipeline({
+    data: { id: 1 },
+    mode: 'target',
+    target: { user: { mappings: names.map((name, index) => ({ sourceVariable: name, targetPath: `$.v${index}` })) } },
+    context: JSON.parse(state.context),
+  });
+
+test('a run that fails on a missing variable puts it in the Runtime context, once, without staling the result', () => {
+  const running = apply(
+    { ...initialState(), mode: 'target', target: '{"user":{"mappings":[]}}', context: '{"variables":{"known":1}}' },
+    { type: 'runStarted', kind: 'transformation' },
+  );
+  const result = missingRun(running, 'entityIdTargetSystem');
+  assert.deepEqual(missingVariableNames(result), ['entityIdTargetSystem']);
+  const done = reducer(running, { type: 'transformationFinished', result });
+  assert.deepEqual(JSON.parse(done.context).variables, { known: 1, entityIdTargetSystem: VARIABLE_PLACEHOLDER });
+  assert.equal(done.contextOpen, true);
+  assert.equal(done.notice.tone, 'info');
+  assert.equal(done.stale, false, 'adding the variable is not an edit of the run that just finished');
+  assert.equal(done.result, result);
+
+  const again = reducer(apply(done, { type: 'runStarted', kind: 'transformation' }), {
+    type: 'transformationFinished',
+    result,
+  });
+  assert.equal(again.context, done.context, 'a variable that is already listed is not added twice');
+});
+
+test('the context is left alone when the run did not fail on a variable, was edited meanwhile, or is not an object', () => {
+  const started = apply({ ...initialState(), context: '{}' }, { type: 'runStarted', kind: 'transformation' });
+  const plain = runPipeline({ data: { id: 1 }, mode: 'target', target: { user: { mappings: [] } } });
+  assert.equal(reducer(started, { type: 'transformationFinished', result: plain }).context, '{}');
+
+  const missing = missingRun(started, 'x');
+  const edited = reducer(started, { type: 'edit', field: 'data', value: '{"id":2}' });
+  const late = reducer(edited, { type: 'transformationFinished', result: missing });
+  assert.equal(late.context, '{}');
+  assert.equal(late.stale, true);
+
+  const broken = apply({ ...started, context: '[1]' }, { type: 'transformationFinished', result: missing });
+  assert.equal(broken.context, '[1]');
+  assert.equal(broken.contextOpen, false);
+});
+
+test('run requests refuse a placeholder that was never replaced', () => {
+  const state = { ...initialState(), context: `{"variables":{"entityIdTargetSystem":"${VARIABLE_PLACEHOLDER}"}}` };
+  assert.throws(() => pipelineRequest(state), /variables\.entityIdTargetSystem still has the placeholder/);
+  assert.throws(() => expressionRequest(state), /variables\.entityIdTargetSystem still has the placeholder/);
+  const filled = { ...state, context: '{"variables":{"entityIdTargetSystem":"t-1"}}' };
+  assert.deepEqual(pipelineRequest(filled).context, { variables: { entityIdTargetSystem: 't-1' } });
 });

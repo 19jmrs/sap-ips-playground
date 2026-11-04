@@ -65,14 +65,19 @@ export function missingVariableName(entity) {
   return MISSING_VARIABLE.exec(entity.errorDetail.message ?? '')?.[1] ?? null;
 }
 
+/** Distinct context variables the entities of a finished run could not find. */
+export function missingVariableNames(result) {
+  return [...new Set((result?.entities ?? []).map(missingVariableName).filter(Boolean))];
+}
+
 export const VARIABLE_PLACEHOLDER = 'REPLACE_WITH_VALUE';
 
 /**
- * The runtime-context text with `variables.<name>` present, so the user only has to type the value. A variable that
- * is already there is left as it is. Returns null when the text is not a JSON object (or `variables` is not one), so
- * the caller leaves it for the editor to report instead of overwriting the user's text.
+ * The runtime-context text with `variables.<name>` present for every name, so the user only has to type the values.
+ * A variable that is already there is left as it is. Returns null when the text is not a JSON object (or `variables`
+ * is not one), so the caller leaves it for the editor to report instead of overwriting the user's text.
  */
-export function contextWithVariable(text, name) {
+export function contextWithVariables(text, names) {
   let context;
   try {
     context = JSON.parse(text);
@@ -81,7 +86,9 @@ export function contextWithVariable(text, name) {
   }
   const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   if (!plain(context) || (context.variables !== undefined && !plain(context.variables))) return null;
-  if (context.variables && Object.hasOwn(context.variables, name)) return text;
-  const variables = { ...context.variables, [name]: VARIABLE_PLACEHOLDER };
+  const absent = names.filter((name) => !(context.variables && Object.hasOwn(context.variables, name)));
+  if (absent.length === 0) return text;
+  const variables = { ...context.variables };
+  for (const name of absent) variables[name] = VARIABLE_PLACEHOLDER;
   return JSON.stringify({ ...context, variables }, null, 2);
 }

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import JsonEditor from './JsonEditor';
 import { pretty } from '../examples';
-import { changes, describeFailure, entityLabel, missingVariableName, stageComparisons } from '../state/results.js';
+import { changes, describeFailure, entityLabel, stageComparisons } from '../state/results.js';
 
 const TABS = [
   ['source', 'After source'],
@@ -35,9 +35,8 @@ function entityStatus(item) {
   return item.skipped ? 'skipped' : 'succeeded';
 }
 
-function FailureNotice({ entity, onSupplyVariable }) {
+function FailureNotice({ entity }) {
   const failure = describeFailure(entity);
-  const missing = onSupplyVariable ? missingVariableName(entity) : null;
   if (!failure) return null;
   const where = [
     failure.stage ? (STAGE_NAMES[failure.stage] ?? failure.stage) : null,
@@ -50,14 +49,6 @@ function FailureNotice({ entity, onSupplyVariable }) {
       {failure.path ? (
         <p>
           Source path: <code>{failure.path}</code>
-        </p>
-      ) : null}
-      {missing ? (
-        <p>
-          <button className="small-button" onClick={() => onSupplyVariable(missing)}>
-            Add {missing} to Runtime context
-          </button>{' '}
-          <span className="muted">Inserts a placeholder; type the real value, then run again.</span>
         </p>
       ) : null}
     </div>
@@ -150,7 +141,7 @@ function TraceView({ entity, debug }) {
   );
 }
 
-export default function Results({ result, stale, debug, mode, onSupplyVariable }) {
+export default function Results({ result, stale, debug, mode }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [tab, setTab] = useState('target');
   const [stage, setStage] = useState('final');
@@ -254,7 +245,7 @@ export default function Results({ result, stale, debug, mode, onSupplyVariable }
               ))}
             </div>
             <div id="result-tabpanel" role="tabpanel" aria-labelledby={`result-tab-${selectedTab}`}>
-              {entity ? <FailureNotice entity={entity} onSupplyVariable={onSupplyVariable} /> : null}
+              {entity ? <FailureNotice entity={entity} /> : null}
               {entity?.skipped ? (
                 <p className="empty-stage">This entity was skipped by its transformation condition.</p>
               ) : null}

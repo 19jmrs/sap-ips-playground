@@ -12,6 +12,8 @@
   --muted: #5a6b82;
   --accent: #00796a;
   --navy: #10213e;
+  /* Inherited by every scrollable box (editors, result views, dialogs): a visible thumb on a visible track. */
+  scrollbar-color: #7f93ab #e8eef5;
 }
 * {
   box-sizing: border-box;
@@ -364,6 +366,12 @@ select {
   min-height: 90px;
   max-height: 90vh;
 }
+/* The CodeMirror wrapper must have a definite height, or the editor grows to its content and the box clips it instead
+   of scrolling. */
+.editor-body > *,
+.editor-dialog-body > * {
+  height: 100%;
+}
 .editor-dialog {
   background: #fff;
   border-radius: 9px;
@@ -389,10 +397,6 @@ select {
 }
 .editor-dialog .inline-error {
   flex: none;
-}
-.cm-editor .cm-scroller {
-  scrollbar-width: thin;
-  scrollbar-color: #d0d9e4 transparent;
 }
 .cm-editor .cm-line {
   padding: 0 10px;

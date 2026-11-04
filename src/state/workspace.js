@@ -1,4 +1,5 @@
 import { examples, pretty } from '../examples.js';
+import { contextWithVariables, missingVariableNames } from './results.js';
 
 // Which editable fields invalidate which result. Revisions let a run that finishes after an edit be marked stale.
 export const TRANSFORMATION_INPUTS = [
@@ -57,6 +58,7 @@ export function blankState(workspace = 'transformations') {
     entityType: 'user',
     entityPath: '$',
     debug: false,
+    contextOpen: false,
     example: '',
     expression: '',
     expressionKind: 'jsonpath',
@@ -173,15 +175,33 @@ export function reducer(state, action) {
       };
     }
 
+    // A run that failed on missing context variables adds them (with a placeholder value) to the Runtime context and
+    // opens it. This is not an edit: the finished run stays current, and run requests refuse a placeholder that was
+    // never replaced, so no invented value can reach a result.
     case 'transformationFinished': {
       const { pending } = state;
+      const stale = state.revision !== pending?.revision;
+      const context = stale ? null : contextWithVariables(state.context, missingVariableNames(action.result));
+      const added = context !== null && context !== state.context;
       return finishRun(state, 'transformation', {
         result: action.result,
         resultMode: pending?.mode,
         resultDebug: pending?.debug,
-        stale: state.revision !== pending?.revision,
+        stale,
+        ...(added && {
+          context,
+          contextOpen: true,
+          notice: {
+            tone: 'info',
+            title: 'Runtime context updated',
+            message: `Added ${missingVariableNames(action.result).join(', ')} to the Runtime context with a placeholder. Enter the real value, then run again.`,
+          },
+        }),
       });
     }
+
+    case 'contextToggled':
+      return state.contextOpen === action.open ? state : { ...state, contextOpen: action.open };
 
     case 'transformationFailed':
       return finishRun(state, 'transformation', {

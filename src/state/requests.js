@@ -1,4 +1,19 @@
 import { parseJsonField } from './caseFile.js';
+import { VARIABLE_PLACEHOLDER } from './results.js';
+
+// The Runtime context as an object. A variable still holding the placeholder the app inserted for a missing variable
+// is refused, because running with it would produce output from an invented value.
+function runtimeContext(text) {
+  const context = parseJsonField(text, 'Runtime context');
+  for (const [name, value] of Object.entries(context?.variables ?? {})) {
+    if (value === VARIABLE_PLACEHOLDER) {
+      throw new Error(
+        `Runtime context: variables.${name} still has the placeholder ${VARIABLE_PLACEHOLDER}. Enter its real value.`,
+      );
+    }
+  }
+  return context;
+}
 
 /** Arguments for `executePipeline`; throws a labelled error when a document the chosen mode needs is not JSON. */
 export function pipelineRequest(state) {
@@ -9,7 +24,7 @@ export function pipelineRequest(state) {
     mode: state.mode,
     entityPath: state.entityPath,
     entityType: state.entityType,
-    context: parseJsonField(state.context, 'Runtime context'),
+    context: runtimeContext(state.context),
     debug: state.debug,
   };
 }
@@ -19,7 +34,7 @@ export function expressionRequest(state) {
     data: parseJsonField(state.data, 'Source data'),
     expression: state.expression,
     kind: state.expressionKind,
-    context: parseJsonField(state.context, 'Runtime context'),
+    context: runtimeContext(state.context),
   };
 }
 

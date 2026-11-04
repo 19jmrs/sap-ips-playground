@@ -103,6 +103,7 @@ export function useWorkspace() {
     running,
     setField: (field, value) => dispatch({ type: 'edit', field, value }),
     setWorkspace: (workspace) => dispatch({ type: 'setWorkspace', workspace }),
+    setContextOpen: (open) => dispatch({ type: 'contextToggled', open }),
     setExpressionKind: (kind) => dispatch({ type: 'setExpressionKind', kind }),
     loadExample: (id) => dispatch({ type: 'loadExample', id }),
     setKeepOnReload: (value) => dispatch({ type: 'setKeepOnReload', value }),
