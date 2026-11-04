@@ -1,14 +1,18 @@
 import { parseJsonField } from './caseFile.js';
-import { VARIABLE_PLACEHOLDER } from './results.js';
+import { CONTEXT_PLACEHOLDER } from './results.js';
 
-// The Runtime context as an object. A variable still holding the placeholder the app inserted for a missing variable
-// is refused, because running with it would produce output from an invented value.
+// The Runtime context as an object. A value still holding the placeholder the app inserted for missing context is
+// refused, because running with it would produce output from an invented value.
 function runtimeContext(text) {
   const context = parseJsonField(text, 'Runtime context');
-  for (const [name, value] of Object.entries(context?.variables ?? {})) {
-    if (value === VARIABLE_PLACEHOLDER) {
+  const placeholders = [
+    ...Object.entries(context?.variables ?? {}).map(([name, value]) => [`variables.${name}`, value]),
+    ['operation', context?.operation],
+  ];
+  for (const [where, value] of placeholders) {
+    if (value === CONTEXT_PLACEHOLDER) {
       throw new Error(
-        `Runtime context: variables.${name} still has the placeholder ${VARIABLE_PLACEHOLDER}. Enter its real value.`,
+        `Runtime context: ${where} still has the placeholder ${CONTEXT_PLACEHOLDER}. Enter its real value.`,
       );
     }
   }

@@ -58,26 +58,30 @@ export function entityLabel(entity) {
 }
 
 const MISSING_VARIABLE = /^Missing context variable: (.+?)\. Supply it under /;
+const MISSING_OPERATION = /^Mapping scope requires context\.operation/;
 
-/** Name of the context variable a failed entity could not find, or null when it failed for another reason. */
-export function missingVariableName(entity) {
-  if (entity?.errorDetail?.code !== 'MISSING_CONTEXT') return null;
-  return MISSING_VARIABLE.exec(entity.errorDetail.message ?? '')?.[1] ?? null;
+/** What the entities of a finished run could not find in the Runtime context: variable names and/or `operation`. */
+export function missingContext(result) {
+  const variables = new Set();
+  let operation = false;
+  for (const entity of result?.entities ?? []) {
+    if (entity?.errorDetail?.code !== 'MISSING_CONTEXT') continue;
+    const message = entity.errorDetail.message ?? '';
+    const name = MISSING_VARIABLE.exec(message)?.[1];
+    if (name) variables.add(name);
+    else if (MISSING_OPERATION.test(message)) operation = true;
+  }
+  return { variables: [...variables], operation };
 }
 
-/** Distinct context variables the entities of a finished run could not find. */
-export function missingVariableNames(result) {
-  return [...new Set((result?.entities ?? []).map(missingVariableName).filter(Boolean))];
-}
-
-export const VARIABLE_PLACEHOLDER = 'REPLACE_WITH_VALUE';
+export const CONTEXT_PLACEHOLDER = 'REPLACE_WITH_VALUE';
 
 /**
- * The runtime-context text with `variables.<name>` present for every name, so the user only has to type the values.
- * A variable that is already there is left as it is. Returns null when the text is not a JSON object (or `variables`
- * is not one), so the caller leaves it for the editor to report instead of overwriting the user's text.
+ * The runtime-context text with `variables.<name>` (and `operation`, when asked) present, so the user only has to
+ * type the values. Anything already there is left as it is. Returns null when the text is not a JSON object (or
+ * `variables` is not one), so the caller leaves it for the editor to report instead of overwriting the user's text.
  */
-export function contextWithVariables(text, names) {
+export function contextWithMissing(text, { variables, operation }) {
   let context;
   try {
     context = JSON.parse(text);
@@ -86,9 +90,13 @@ export function contextWithVariables(text, names) {
   }
   const plain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   if (!plain(context) || (context.variables !== undefined && !plain(context.variables))) return null;
-  const absent = names.filter((name) => !(context.variables && Object.hasOwn(context.variables, name)));
-  if (absent.length === 0) return text;
-  const variables = { ...context.variables };
-  for (const name of absent) variables[name] = VARIABLE_PLACEHOLDER;
-  return JSON.stringify({ ...context, variables }, null, 2);
+  const absent = variables.filter((name) => !(context.variables && Object.hasOwn(context.variables, name)));
+  const needsOperation = operation && context.operation === undefined;
+  if (absent.length === 0 && !needsOperation) return text;
+  const next = { ...context };
+  if (absent.length > 0) {
+    next.variables = { ...context.variables, ...Object.fromEntries(absent.map((name) => [name, CONTEXT_PLACEHOLDER])) };
+  }
+  if (needsOperation) next.operation = CONTEXT_PLACEHOLDER;
+  return JSON.stringify(next, null, 2);
 }

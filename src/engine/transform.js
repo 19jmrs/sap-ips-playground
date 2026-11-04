@@ -80,7 +80,12 @@ function skipStatus(mapping, record, data, env) {
   // Without an explicit scope, update and delete operations skip the mapping.
   if (['patchEntity', 'deleteEntity'].includes(env.operation) && mapping.scope === undefined) return 'scope-skipped';
   if (mapping.scope !== undefined) {
-    if (!env.operation) failWith('MISSING_CONTEXT', 'Mapping scope requires context.operation');
+    if (!env.operation) {
+      failWith(
+        'MISSING_CONTEXT',
+        `Mapping scope requires context.operation: set "operation" in the Runtime context to one of ${contextOperations.join(', ')}.`,
+      );
+    }
     const scopes = Array.isArray(mapping.scope) ? mapping.scope : [mapping.scope];
     if (!scopes.includes(env.operation)) return 'scope-skipped';
   }
