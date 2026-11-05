@@ -85,7 +85,7 @@ More examples and guidance for building a reference case are in [docs/context.md
 
 The evaluator is an independent JavaScript implementation based on SAP's public documentation. It covers the mapping types `set`, `remove`, `rename` and `valueMapping`, all 27 documented mapping functions, IPS conditions and a Jayway-style JSONPath dialect.
 
-- Conditions, JSONPath, regular expressions and dates were compared against real **Jayway JsonPath 2.9.0** and the JDK in a [differential review](runs/20261103-review/reports/EngineReview-r1.md). That is evidence about those libraries, **not about SAP's service**.
+- Conditions, JSONPath, regular expressions and dates were compared against real **Jayway JsonPath 2.9.0** and the JDK in a [differential review](docs/engine-review.md). That is evidence about those libraries, **not about SAP's service**.
 - No row of the compatibility matrix has been verified against a live IPS tenant yet. See [docs/coverage.md](docs/coverage.md) for what is supported, what is bounded and what is explicitly unsupported.
 - The documented IPS features the project is based on are listed in [docs/ips-inventory.md](docs/ips-inventory.md).
 
