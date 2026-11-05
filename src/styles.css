@@ -722,6 +722,7 @@ footer p {
   font-size: 10px;
   text-align: right;
 }
+footer a,
 footer button {
   color: #416b8b;
   font-size: inherit;

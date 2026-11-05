@@ -1,47 +1,122 @@
 # SAP IPS Transformation Playground
 
-A local browser application for experimenting with pasted JSON and SAP Identity Provisioning transformations. The interface is in English. This is an independent implementation, not an SAP service or a certified IPS runtime.
+Try SAP Identity Provisioning (IPS) transformations in your browser. Paste a JSON entity, paste a source and/or target transformation, press **Run**, and see the output of every stage, what changed, and which mapping failed and why.
 
-## Start
+![The transformation workspace after a Source → Target run](docs/screenshot.png)
+
+> **Independent project.** This is not an SAP product and not a certified IPS runtime. SAP and SAP Identity Provisioning are trademarks of SAP SE; this project is not affiliated with or endorsed by SAP. Results are a close local approximation, **not proof of what your IPS tenant will do**. Always confirm against IPS before relying on a result. See [Compatibility](#compatibility).
+
+## What it does
+
+- **Three run modes:** *Source only*, *Target only* or *Source → Target*, so you can test a read transformation, a write transformation, or the whole chain on one entity or a batch.
+- **Per-stage results:** *After source*, *After target*, *Variables* (values set with `targetVariable`), *Changes* (a diff between stages) and an optional per-mapping *Trace*.
+- **Clear failures:** a failed entity shows the stage, the mapping number and the exact reason. Unsupported syntax is reported as an error and never guessed.
+- **Editors that know the language:** JSON editors with diagnostics, hover help and completions for mapping keys, functions and paths. Accept a suggestion with Tab or Enter. Editors can be resized and expanded to a larger window.
+- **Expression workspace:** evaluate a JSONPath or an IPS condition against your data.
+- **Runtime context:** supply the things IPS normally provides (variables, properties, the operation, resolved IDs). The toolbar has an **Operation** selector for mappings that use a `scope`. When a run needs a variable you haven't given, the app adds a placeholder to the context for you to fill in.
+- **Cases:** export your whole workspace to a JSON file and import it again later. An imported case never runs by itself.
+
+## Privacy
+
+Everything runs in your browser. There is no server, no analytics and no network request for your data. Nothing is stored unless you tick *Keep work across reloads in this tab*, which keeps the inputs (never the results) in that tab's `sessionStorage`. **Use fictitious data.** Details are in the app under *Privacy details*.
+
+## Run it locally
 
 Requires Node.js 20.19+ or 22.12+ and npm.
 
-```powershell
-cd E:/Projects/sap-ips-playground
+```bash
+git clone https://github.com/19jmrs/sap-ips-playground.git
+cd sap-ips-playground
 npm ci
 npm run dev
 ```
 
-Open the Local URL printed by Vite (normally http://127.0.0.1:5173). To produce static files:
+Open the address Vite prints (normally http://127.0.0.1:5173). No credentials, API keys or environment variables are needed.
 
-```powershell
-npm test
-npm run build
-npm run preview
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Development server |
+| `npm test` | Runs the test suite (Node's built-in runner) |
+| `npm run build` | Builds the static site into `dist/` |
+| `npm run preview` | Serves `dist/` locally |
+| `npx prettier --check "src/**/*.{js,jsx,css}" "tests/*.js"` | Checks formatting |
+
+## Deploy to Vercel
+
+The app is a static Vite site, so no server code or environment variables are involved.
+
+1. Push the repository to GitHub (already done if you forked it).
+2. In Vercel choose **Add New → Project** and import the repository.
+3. Keep the detected settings: framework **Vite**, build command `npm run build`, output directory `dist`.
+4. Deploy.
+
+After each new deployment, a browser tab that was already open still points at the previous build's files and can show *"The execution worker failed"*. Reloading the page fixes it.
+
+## Using it
+
+1. Pick an example from the list, or paste your own entity into **Source data**.
+2. Choose a mode, then paste your **source** and/or **target** transformation.
+3. Set the **entity path** (use *Detect* for a guess) and the **entity type**.
+4. If a mapping has a `scope`, choose an **Operation** (`createEntity`, `patchEntity` or `deleteEntity`).
+5. Press **Run transformation**. Editing never runs anything by itself.
+
+### Runtime context
+
+The collapsible *Runtime context* box is JSON that stands in for what IPS provides at run time:
+
+```json
+{
+  "operation": "createEntity",
+  "variables": { "entityIdTargetSystem": "target-42" },
+  "properties": { "domain": "example.com" },
+  "resolutions": { "user": { "source-1": "target-42" } },
+  "localeMappings": [["EN", "en-US"]]
+}
 ```
 
-No credentials, database, API keys or environment variables are required. No deployment was performed.
+- **Variables are local to a stage.** A variable set by a source mapping is not visible to the target stage, with one exception: in a Source → Target run, `entityIdSourceSystem` set by the source stage (`{"sourcePath": "$.id", "targetVariable": "entityIdSourceSystem"}`) can be read by the target stage of the same entity. This follows SAP's description of that variable but has **not** been checked against a real IPS run.
+- **`entityIdTargetSystem`** and other values IPS would supply must be given under `variables`.
+- **Missing values are errors, never invented.** A run is refused while a placeholder the app inserted (`REPLACE_WITH_VALUE`) is still in the context.
+- A mapping with a `scope` needs an operation, and runs only when the operation is one of its scopes. A mapping without a `scope` runs when no operation is set or it is `createEntity`, and is skipped for `patchEntity` and `deleteEntity`.
 
-## Workflow
+More examples and guidance for building a reference case are in [docs/context.md](docs/context.md).
 
-1. Load a synthetic example or paste a JSON entity or batch.
-2. Choose Source only, Target only, or Source → Target. Paste the appropriate IPS transformation documents.
-3. Check the entity path and user/group section. Supply required external context explicitly.
-4. Click Run. Inspect each entity, source and target output, changes, errors and optional mapping trace.
-5. Switch to Expressions to evaluate JSONPath or IPS conditions against the input. Expression evaluation also requires Run.
+## Compatibility
 
-Editing does not run transformations. Formatting and editor diagnostics may update without execution.
+The evaluator is an independent JavaScript implementation based on SAP's public documentation. It covers the mapping types `set`, `remove`, `rename` and `valueMapping`, all 27 documented mapping functions, IPS conditions and a Jayway-style JSONPath dialect.
 
-## Compatibility and privacy
+- Conditions, JSONPath, regular expressions and dates were compared against real **Jayway JsonPath 2.9.0** and the JDK in a [differential review](runs/20261103-review/reports/EngineReview-r1.md). That is evidence about those libraries, **not about SAP's service**.
+- No row of the compatibility matrix has been verified against a live IPS tenant yet. See [docs/coverage.md](docs/coverage.md) for what is supported, what is bounded and what is explicitly unsupported.
+- The documented IPS features the project is based on are listed in [docs/ips-inventory.md](docs/ips-inventory.md).
 
-Read [the official inventory](docs/ips-inventory.md), [coverage](docs/coverage.md) and [architecture](docs/architecture.md). Supported reference behavior is not proof of full SAP parity. Unknown or unsupported behavior must produce a visible error. Real IPS differential fixtures are needed for further compatibility verification.
+If a transformation behaves differently in IPS than here, please [open an issue](https://github.com/19jmrs/sap-ips-playground/issues) with an anonymised example.
 
-All payload processing is local to the browser. No application server receives input documents. Nothing is stored by default. An opt-in footer option keeps editor inputs (never results) in this tab's `sessionStorage` across reloads; Clear workspace removes them. Browsers may retain or restore in-memory pages and session storage; a website cannot guarantee forensic erasure on browser closure. Use fictitious data. Export and Import case use local files you control; imported cases never run automatically.
+## Known limits
 
-CodeMirror provides integrated editor language services. There is no Language Server Protocol server. See architecture for the LSP tradeoff and future extension boundary.
+- A run is limited to 5 MB of input and stops after 5 seconds.
+- Very large documents can make the editors slow.
+- Runs are manual only; there is no live evaluation while typing.
+- No remote operations are simulated: `operation` only selects which scoped mappings run, and nothing is created, patched or deleted anywhere.
+- Editor intelligence comes from CodeMirror. There is no Language Server Protocol server (see [docs/architecture.md](docs/architecture.md)).
+- Tested in Chromium. Other browsers should work but have not been checked.
 
-## Verified delivery
+## Project layout
 
-Last verified after the review run (`runs/20261103-review/`): `npm test` passes 336 tests, `npm run build` succeeds and Prettier is clean. The built app was exercised in headless Chromium: running examples, the stage-diff selector, opt-in session recovery, case import and rejection of a bad file, the coverage dialog, editor diagnostics, and the expression workspace (whole-value `=~`, `EMPTY` on missing values), with no console errors and no requests leaving the origin. Condition, JSONPath, regex and date behaviour was compared with real Jayway JsonPath 2.9.0 and the JDK's `java.util.regex` and `java.time` in a differential review ([report](runs/20261103-review/reports/EngineReview-r1.md)); that is evidence about those libraries, not about SAP's service. Other browser engines, mobile layout and assistive-technology use have not been tested.
+```
+src/engine/       the transformation evaluator (paths, conditions, mappings, functions)
+src/editor/       editor diagnostics, hover text and completions built on the engine's validators
+src/state/        workspace state, run requests, case files, session storage
+src/components/   React UI
+src/hooks/        workspace hook, modal and session helpers
+src/execution*.js runs each request in a disposable Web Worker with a size limit and a timeout
+tests/            test suite
+docs/             coverage matrix, IPS inventory, runtime context guide, architecture
+```
 
-Runtime context examples and reference-fixture guidance: [context](docs/context.md). There is no actual LSP server and no hosted deployment; run it locally with `npm run preview` after `npm run build`.
+## Contributing
+
+Issues and pull requests are welcome. Before sending a change, run `npm test` and the Prettier check above. Please use only fictitious or anonymised data in examples, tests and issues, and add a test for any behaviour you change.
+
+## License
+
+[MIT](LICENSE) © 2026 Jorge

@@ -1,3 +1,5 @@
+const REPOSITORY_URL = 'https://github.com/19jmrs/sap-ips-playground';
+
 export default function Footer({ keepOnReload, storageNote, onKeepOnReload, onOpenInfo }) {
   return (
     <footer>
@@ -22,6 +24,11 @@ export default function Footer({ keepOnReload, storageNote, onKeepOnReload, onOp
       <p>
         Independent implementation. SAP IPS equivalence is not certified.{' '}
         <button onClick={() => onOpenInfo('coverage')}>Check compatibility before relying on results.</button>
+      </p>
+      <p>
+        <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+          Source code, issues and license on GitHub
+        </a>
       </p>
     </footer>
   );
