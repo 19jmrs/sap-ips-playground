@@ -20,7 +20,9 @@ Try SAP Identity Provisioning (IPS) transformations in your browser. Paste a JSO
 
 ## Privacy
 
-Everything runs in your browser. There is no server, no analytics and no network request for your data. Nothing is stored unless you tick *Keep work across reloads in this tab*, which keeps the inputs (never the results) in that tab's `sessionStorage`. **Use fictitious data.** Details are in the app under *Privacy details*.
+Everything you enter is processed in your browser. There is no server for your data and no cookies. Nothing is stored unless you tick *Keep work across reloads in this tab*, which keeps the inputs (never the results) in that tab's `sessionStorage`. **Use fictitious data.** Details are in the app under *Privacy details*.
+
+**Visitor statistics.** The live site counts anonymous page views with [Umami](https://umami.is) (cookie-free). Each page load sends the page address, title, referrer, screen size and browser language to Umami, and nothing is sent when the browser has Do Not Track on. Editor contents, transformations and results are never part of that request. A Content-Security-Policy (`vercel.json`) limits the site to its own origin plus `cloud.umami.is` and `gateway.umami.is`. The tracking script is in `index.html`; remove it to run without any analytics.
 
 ## Run it locally
 

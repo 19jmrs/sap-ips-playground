@@ -1,7 +1,7 @@
 # Architecture and language tooling
 
 ## Runtime boundary
-React + Vite produces a static application. The transformation engine executes entirely in the browser; there is no application API, tenant connection, authentication, analytics, remote provisioning, or payload logging. The development HTTP server serves application assets. Dependencies are bundled, not fetched from a CDN at runtime.
+React + Vite produces a static application. The transformation engine executes entirely in the browser; there is no application API, tenant connection, authentication, remote provisioning, or payload logging. The only third-party request is the Umami page-view counter described in the README (address, title, referrer, screen size and language; never editor contents), limited by a Content-Security-Policy in `vercel.json`. The development HTTP server serves application assets. Dependencies are bundled, not fetched from a CDN at runtime.
 
 Input documents and results live in React state. By default nothing is written to browser storage. The footer option "Keep work across reloads in this tab" (default off) stores editor inputs and selections, never results, in `sessionStorage` for the current tab only, debounced, and removed by Clear workspace or by turning the option off. No localStorage, IndexedDB, cookies or service worker is used. Closing a tab ordinarily releases `sessionStorage`, but browsers can restore it after a crash or tab restore, suspend pages, use back/forward caches or retain process memory. A website cannot guarantee forensic deletion from a user's browser; use synthetic data. If storage is unavailable the app falls back to memory only and says so.
 

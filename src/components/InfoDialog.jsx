@@ -50,9 +50,17 @@ function PrivacyContent({ keepOnReload }) {
   return (
     <>
       <p>
-        Payloads, transformations and context are processed in your browser. The app has no processing server,
-        analytics, cookies or logging, and nothing you enter is sent anywhere. Exporting creates a local file you
-        control; importing reads only a file you choose, locally. Prefer fictional data.
+        Payloads, transformations and context are processed in your browser. The app has no processing server, no
+        cookies and no logging of what you enter, and nothing you enter is sent anywhere. Exporting creates a local file
+        you control; importing reads only a file you choose, locally. Prefer fictional data.
+      </p>
+      <h3>Visitor statistics</h3>
+      <p>
+        The site counts anonymous page views with Umami (a cookie-free analytics service). Each page load sends the page
+        address, the page title, the referring site, your screen size and browser language to Umami. It is not sent when
+        your browser has Do Not Track on. The contents of the editors, your transformations and your results are never
+        part of that request, and the site’s Content-Security-Policy only allows requests to Umami’s two hosts besides
+        this site.
       </p>
       <h3>Reloading the page</h3>
       {keepOnReload ? (

@@ -4,7 +4,7 @@ export default function Footer({ keepOnReload, storageNote, onKeepOnReload, onOp
   return (
     <footer>
       <span>
-        <span className="privacy-dot" /> Runs in your browser. Use synthetic data.
+        <span className="privacy-dot" /> Runs in your browser. Use synthetic data. Anonymous page views are counted.
       </span>
       <label className="keep-toggle">
         <input type="checkbox" checked={keepOnReload} onChange={(event) => onKeepOnReload(event.target.checked)} />
